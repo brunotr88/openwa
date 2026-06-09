@@ -13,3 +13,12 @@ dist/
 coverage/
 *.tsbuildinfo
 logs/
+
+# managed by open-wa
+**.data.json
+**.node-persist**
+**_IGNORE_**
+# end managed by open-wa
+
+# Gateway schema is a synced copy of /prisma/schema.prisma (source of truth)
+gateway/prisma/schema.prisma
