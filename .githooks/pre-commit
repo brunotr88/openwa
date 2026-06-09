@@ -1,0 +1,5 @@
+#!/bin/sh
+GL="${HOME}/.local/bin/gitleaks"
+[ -x "$GL" ] || GL=$(command -v gitleaks)
+[ -z "$GL" ] && { echo "⚠ gitleaks not installed"; exit 0; }
+"$GL" protect --staged --no-banner --redact || { echo "❌ COMMIT BLOCKED: secrets detected"; exit 1; }

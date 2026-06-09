@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+.env.production
+.env.staging
+.next/
+gateway/sessions/
+*.tmp
+out/
+dist/
+.DS_Store
+coverage/
+*.tsbuildinfo

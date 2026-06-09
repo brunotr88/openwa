@@ -1,0 +1,11 @@
+title = "Project gitleaks config"
+[allowlist]
+paths = [".env.example", "prisma/seed.ts", "scripts/seed-runner.js"]
+regexes = [
+  '''postgres://user:password@localhost''',
+  '''smtp\.example\.com''',
+  '''admin@example\.com''',
+  '''noreply@example\.com''',
+  '''CHANGE_ME''',
+  '''0000000000000000000000000000000000000000000000000000000000000000''',
+]
