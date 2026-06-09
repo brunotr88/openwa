@@ -1,7 +1,7 @@
 // Gateway bootstrap.
 //
 //   1. load env
-//   2. instantiate OpenWaEngine
+//   2. instantiate BaileysEngine
 //   3. wire engine.onMessage(handleInbound) and a status-change persister
 //   4. start the internal HTTP server on PORT (default 8080)
 //   5. auto-resume sessions whose WaSession.status === 'CONNECTED'
@@ -10,7 +10,7 @@
 // work is already guarded inside the engine; here we additionally guard startup.
 
 import "dotenv/config";
-import { OpenWaEngine } from "./openwa-engine";
+import { BaileysEngine } from "./baileys-engine";
 import { handleInbound } from "./inbound";
 import { createApp } from "./http";
 import { db } from "./db";
@@ -30,7 +30,7 @@ async function persistStatus(sessionId: string, status: WaStatus): Promise<void>
   }
 }
 
-async function resumeConnectedSessions(engine: OpenWaEngine): Promise<void> {
+async function resumeConnectedSessions(engine: BaileysEngine): Promise<void> {
   let sessions: { id: string }[] = [];
   try {
     sessions = await db.waSession.findMany({
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const engine = new OpenWaEngine();
+  const engine = new BaileysEngine();
   engine.onMessage(handleInbound);
   engine.onStatusChange((sessionId, status) => {
     void persistStatus(sessionId, status);
