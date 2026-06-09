@@ -38,6 +38,18 @@ type StatusHandler = (sessionId: string, status: WaStatus) => void;
 const SESSIONS_DIR = process.env.SESSIONS_DIR ?? "/app/sessions";
 const CHROMIUM_PATH = process.env.PUPPETEER_EXECUTABLE_PATH;
 
+// Chromium flags required to run headless inside a Docker container as root:
+//   --no-sandbox / --disable-setuid-sandbox : Chromium refuses to start as root otherwise
+//   --disable-dev-shm-usage                 : Docker's default /dev/shm (64MB) is too small,
+//                                             causing renderer crashes / WA Web load timeouts
+//   --disable-gpu                           : no GPU in the container
+const CHROMIUM_ARGS = [
+  "--no-sandbox",
+  "--disable-setuid-sandbox",
+  "--disable-dev-shm-usage",
+  "--disable-gpu",
+];
+
 /** Map an open-wa connection state string to our WaStatus enum. */
 function mapState(state: string): WaStatus {
   switch (state) {
@@ -128,6 +140,7 @@ export class OpenWaEngine implements WaEngine {
         authTimeout: 0,
         disableSpins: true,
         qrLogSkip: true,
+        chromiumArgs: CHROMIUM_ARGS,
         ...(CHROMIUM_PATH ? { executablePath: CHROMIUM_PATH } : {}),
         // QR also delivered here as a redundancy to the global `ev` channel.
         qrCallback: (qrcode: string) => {
