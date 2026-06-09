@@ -1,0 +1,259 @@
+// This is your Prisma schema file for OpenWA
+// Fase 1 models: Tenant, User, UserTenant, WaSession, Contact, Conversation, Message, AiConfig, AuditLog
+// Fase 2 models (vector): KnowledgeDoc, KnowledgeChunk, Correction — commented out
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum GlobalRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum TenantRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}
+
+enum WaSessionStatus {
+  QR
+  CONNECTED
+  BANNED
+  OFFLINE
+}
+
+enum OptInStatus {
+  IN
+  OUT
+  UNKNOWN
+}
+
+enum ConversationMode {
+  AUTO
+  COPILOT
+  MANUAL
+}
+
+enum ConversationStatus {
+  OPEN
+  SNOOZED
+  CLOSED
+}
+
+enum MessageDirection {
+  IN
+  OUT
+}
+
+enum MessageStatus {
+  RECEIVED
+  DRAFT
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageSource {
+  WA
+  API
+  CAMPAIGN
+}
+
+enum AiProviderType {
+  BEDROCK
+  OPENAI
+}
+
+// ─── Core Tenant ─────────────────────────────────────────────────────────────
+
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  deletedAt DateTime?
+
+  userTenants   UserTenant[]
+  waSessions    WaSession[]
+  contacts      Contact[]
+  conversations Conversation[]
+  messages      Message[]
+  aiConfigs     AiConfig[]
+  auditLogs     AuditLog[]
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  passwordHash   String
+  name           String
+  role           GlobalRole @default(VIEWER)
+  failedAttempts Int        @default(0)
+  lockedUntil    DateTime?
+  totpSecret     String?    // encrypted with AES-256-GCM
+  createdAt      DateTime   @default(now())
+
+  userTenants          UserTenant[]
+  assignedConversations Conversation[]
+  auditLogs            AuditLog[]
+}
+
+model UserTenant {
+  id       String     @id @default(cuid())
+  userId   String
+  tenantId String
+  role     TenantRole @default(VIEWER)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+// ─── WhatsApp Sessions ───────────────────────────────────────────────────────
+
+model WaSession {
+  id             String          @id @default(cuid())
+  tenantId       String
+  phoneLabel     String
+  status         WaSessionStatus @default(OFFLINE)
+  sessionDataRef String?         // encrypted reference to session file path
+  lastSeenAt     DateTime?
+  createdAt      DateTime        @default(now())
+  deletedAt      DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ─── Contacts ────────────────────────────────────────────────────────────────
+
+model Contact {
+  id             String      @id @default(cuid())
+  tenantId       String
+  waId           String      // WhatsApp ID (phone@c.us)
+  name           String?
+  profileSummary String?     // LLM-generated summary of contact preferences
+  optInStatus    OptInStatus @default(UNKNOWN)
+  tags           String[]    @default([])
+  createdAt      DateTime    @default(now())
+  deletedAt      DateTime?
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  conversations Conversation[]
+
+  @@unique([tenantId, waId])
+  @@index([tenantId])
+}
+
+// ─── Conversations ───────────────────────────────────────────────────────────
+
+model Conversation {
+  id            String             @id @default(cuid())
+  tenantId      String
+  contactId     String
+  sessionId     String
+  mode          ConversationMode   @default(MANUAL)
+  status        ConversationStatus @default(OPEN)
+  lastMessageAt DateTime?
+  assignedUserId String?
+  deletedAt     DateTime?
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  session  WaSession @relation(fields: [sessionId], references: [id])
+  assignee User?     @relation(fields: [assignedUserId], references: [id])
+  messages Message[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
+model Message {
+  id             String          @id @default(cuid())
+  conversationId String
+  tenantId       String
+  direction      MessageDirection
+  body           String?
+  mediaRef       String?
+  status         MessageStatus
+  aiGenerated    Boolean         @default(false)
+  source         MessageSource   @default(WA)
+  createdAt      DateTime        @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+
+  @@index([conversationId])
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ─── AI Config ───────────────────────────────────────────────────────────────
+
+model AiConfig {
+  id                 String         @id @default(cuid())
+  tenantId           String         @unique
+  provider           AiProviderType @default(BEDROCK)
+  modelId            String         @default("eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
+  systemPrompt       String?
+  temperature        Float          @default(0.7)
+  autoReplyEnabled   Boolean        @default(false)
+  businessHours      Json?          // { timezone, days, startHour, endHour }
+  updatedAt          DateTime       @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  tenantId  String?
+  action    String
+  entity    String
+  entityId  String?
+  meta      Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
