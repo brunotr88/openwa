@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.githooks
+.env
+.env.local
+.env.production
+.env.staging
+docs
+logs
+tests
+coverage
+*.tmp
+*.tsbuildinfo
+.DS_Store
+gateway/sessions
+README.md

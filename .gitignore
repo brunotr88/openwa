@@ -4,6 +4,7 @@ node_modules/
 .env.production
 .env.staging
 .next/
+next-env.d.ts
 gateway/sessions/
 *.tmp
 out/
@@ -11,3 +12,4 @@ dist/
 .DS_Store
 coverage/
 *.tsbuildinfo
+logs/
