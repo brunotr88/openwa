@@ -6,6 +6,9 @@ import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 export const authConfig: NextAuthConfig = {
+  // Required behind a reverse proxy (Coolify/Traefik) — without it NextAuth v5
+  // throws UntrustedHost: "Host must be trusted" on every auth request.
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
