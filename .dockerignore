@@ -13,5 +13,5 @@ coverage
 *.tmp
 *.tsbuildinfo
 .DS_Store
-gateway/sessions
+gateway
 README.md
