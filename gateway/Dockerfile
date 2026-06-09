@@ -1,37 +1,28 @@
 # syntax=docker/dockerfile:1
-# OpenWA gateway — Node + Chromium worker for @open-wa/wa-automate.
+# OpenWA gateway — Node worker for the Baileys (WhatsApp Web WebSocket) engine.
 #
 # BUILD CONTEXT: the repository ROOT (not gateway/), because the gateway reuses
 # the shared Prisma schema at prisma/schema.prisma. In Coolify set:
 #   Dockerfile location = gateway/Dockerfile
 #   Base directory      = /            (repo root as build context)
 #
-# Alpine is intentionally NOT used: open-wa/puppeteer needs glibc + a real
-# Chromium. node:22-bookworm-slim gives us Debian glibc; we install the distro
-# chromium and tell puppeteer to use it (no bundled-Chromium download).
+# Baileys needs NO Chromium/puppeteer/X11/fonts — it speaks the multi-device
+# protocol directly over a WebSocket. We only need openssl + ca-certificates
+# (Prisma engine / TLS) and wget (container healthcheck). The image is therefore
+# dramatically smaller than the old open-wa one.
 
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
 
-# Chromium + the runtime libs open-wa/puppeteer needs, plus fonts so QR/media
-# render, and openssl for Prisma.
+# Minimal runtime deps: openssl + ca-certificates for Prisma/TLS, wget for the
+# container healthcheck. No chromium, no fonts, no X11 libs.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      chromium \
-      ca-certificates \
-      fonts-liberation \
-      fonts-noto-color-emoji \
-      libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
-      libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
-      libgbm1 libasound2 libpangocairo-1.0-0 libpango-1.0-0 libcairo2 \
-      libgtk-3-0 \
       openssl \
-      wget curl \
+      ca-certificates \
+      wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Puppeteer: never download its own Chromium; use the system one.
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
-    NODE_ENV=production
+ENV NODE_ENV=production
 
 # ── Build stage ───────────────────────────────────────────────────────────────
 FROM base AS builder
@@ -70,7 +61,7 @@ COPY --from=builder /app/gateway/dist ./dist
 COPY --from=builder /app/gateway/package.json ./package.json
 COPY --from=builder /app/prisma /app/prisma
 
-# Session token volume (persisted by Coolify).
+# Session creds volume (persisted by Coolify): Baileys multi-file auth state.
 RUN mkdir -p /app/sessions
 
 EXPOSE 8080
