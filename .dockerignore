@@ -13,5 +13,8 @@ coverage
 *.tmp
 *.tsbuildinfo
 .DS_Store
-gateway
+gateway/node_modules
+gateway/dist
+gateway/sessions
+gateway/prisma
 README.md
