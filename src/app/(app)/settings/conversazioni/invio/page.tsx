@@ -86,7 +86,7 @@ export default function InvioPage() {
             <ShieldCheck size={22} className="text-primary" />
             Invio e protezione numero
           </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <p className="mt-1 text-sm text-muted-foreground">
             Proteggiamo il tuo numero: ritmi e limiti che imitano un operatore
             umano. I bot solo-reattivi hanno un rischio ban &lt; 2%.
           </p>
@@ -157,7 +157,7 @@ export default function InvioPage() {
           />
           {sending.sendProfile === "personalizzato" && (
             <p className="text-xs font-semibold text-warn-fg">
-              Profilo personalizzato attivo — valori nella sezione avanzata.
+              Profilo personalizzato attivo: valori nella sezione avanzata.
             </p>
           )}
 

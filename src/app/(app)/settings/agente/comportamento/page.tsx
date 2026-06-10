@@ -68,7 +68,7 @@ export default function ComportamentoPage() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Comportamento risposte</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <p className="mt-1 text-sm text-muted-foreground">
             Come risponde il bot e quando passa la conversazione a un umano.
           </p>
         </div>
@@ -168,7 +168,7 @@ export default function ComportamentoPage() {
             accent="red"
             maxRules={30}
           />
-          <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          <p className="text-xs text-muted-foreground">
             Argomenti su cui l&apos;AI declina sempre, con gentilezza.
           </p>
         </div>
@@ -216,7 +216,7 @@ export default function ComportamentoPage() {
             accent="red"
             maxRules={100}
           />
-          <p className="mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+          <p className="mt-2 text-xs text-muted-foreground">
             Parole che passano subito a un umano (la risposta resta in bozza).
             Aggiungi termini del tuo settore.
           </p>
@@ -271,7 +271,7 @@ export default function ComportamentoPage() {
                 placeholder="Istruzioni aggiuntive per l'AI…"
                 className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
               />
-              <p className="text-right text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="text-right text-xs text-muted-foreground">
                 {customDraft.length}/4000
               </p>
             </div>

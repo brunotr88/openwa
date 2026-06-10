@@ -82,9 +82,7 @@ function NumberField({
         }}
         className="w-24 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
       />
-      <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-        {unit}
-      </span>
+      <span className="text-xs text-muted-foreground">{unit}</span>
     </div>
   );
 }
@@ -178,7 +176,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Appuntamenti</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <p className="mt-1 text-sm text-muted-foreground">
             Come l&apos;AI gestisce le richieste di appuntamento dei clienti su WhatsApp.
           </p>
         </div>
@@ -233,7 +231,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
         >
           <SettingRow
             label="URL Calendly"
-            description="Es. https://calendly.com/tuonome/30min — deve iniziare con https://."
+            description="Es. https://calendly.com/tuonome/30min (deve iniziare con https://)."
             stacked
           >
             <CalendlyUrlField
@@ -264,7 +262,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
                   Il tuo amministratore ha configurato l&apos;account di servizio:{" "}
                   <strong>
                     {saEmail ??
-                      "(non ancora configurato — chiedi all'amministratore di impostare GOOGLE_SA_EMAIL)"}
+                      "(non ancora configurato: chiedi all'amministratore di impostare GOOGLE_SA_EMAIL)"}
                   </strong>
                   .
                 </li>
@@ -301,7 +299,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
                 type="button"
                 onClick={() => void verifyConnection()}
                 disabled={verifying}
-                className="inline-flex items-center gap-2 rounded-md border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-60"
+                className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-primary/50 px-3 py-2 text-sm font-medium text-primary shadow-sm transition-colors hover:border-primary hover:bg-primary/10 disabled:opacity-60"
               >
                 {verifying ? (
                   <Loader2 size={14} className="animate-spin" />

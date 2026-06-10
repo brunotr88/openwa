@@ -67,7 +67,7 @@ export default function ProfiloPage() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-2xl font-bold tracking-tight">Profilo e persona</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+        <p className="mt-1 text-sm text-muted-foreground">
           Chi è il tuo assistente: settore, identità e stile di comunicazione.
         </p>
       </header>
@@ -109,7 +109,7 @@ export default function ProfiloPage() {
                 </span>
                 <span>
                   <span className="block text-sm font-medium">{p.label}</span>
-                  <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  <span className="block text-xs text-muted-foreground">
                     {p.tagline}
                   </span>
                 </span>
@@ -196,7 +196,7 @@ export default function ProfiloPage() {
                     <span className="text-sm font-medium">{t.label}</span>
                     {t.value === "professionale" && <RecommendedBadge />}
                   </div>
-                  <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                  <p className="text-xs text-muted-foreground">
                     {t.description}
                   </p>
                   <p className="mt-2 rounded-md bg-primary/10 px-2 py-1.5 text-xs italic">

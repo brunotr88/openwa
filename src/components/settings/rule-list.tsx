@@ -101,7 +101,7 @@ export function RuleList({
       {visibleExamples.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">
-            Esempi per il tuo settore — tocca per aggiungere:
+            Esempi per il tuo settore, tocca per aggiungere:
           </p>
           <div className="flex flex-wrap gap-1.5">
             {visibleExamples.map((ex) => (

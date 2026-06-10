@@ -94,7 +94,7 @@ export function SaveToast() {
   const styles: Record<Exclude<SaveState, "idle">, { text: string; cls: string }> = {
     saving: { text: "Salvataggio…", cls: "text-muted-foreground" },
     saved: { text: "Salvato ✓", cls: "text-success-fg" },
-    error: { text: "Errore di salvataggio — modifica annullata", cls: "text-danger" },
+    error: { text: "Errore di salvataggio: modifica annullata", cls: "text-danger" },
   };
   const s = styles[saveState];
   return (

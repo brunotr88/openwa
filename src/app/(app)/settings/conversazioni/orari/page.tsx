@@ -30,8 +30,8 @@ export default function OrariPage() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Orari e disponibilità</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Quando è operativo il tuo team — e cosa fa l&apos;AI nel resto del tempo.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quando è operativo il tuo team e cosa fa l&apos;AI nel resto del tempo.
           </p>
         </div>
         <ResetToRecommended sections={["hours"]} />

@@ -24,7 +24,7 @@ const mono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OpenWA — Assistente WhatsApp",
+  title: "OpenWA · Assistente WhatsApp",
   description:
     "Console operativa per gestire WhatsApp con l'AI: inbox, bozze approvabili e assistente conversazionale per la tua attività.",
   applicationName: "OpenWA",

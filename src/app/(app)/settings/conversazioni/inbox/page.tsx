@@ -21,7 +21,7 @@ export default function InboxPrefsPage() {
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">Preferenze Inbox</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <p className="mt-1 text-sm text-muted-foreground">
             Cosa entra nella tua inbox e come viene tenuta in ordine.
           </p>
         </div>
@@ -92,7 +92,7 @@ export default function InboxPrefsPage() {
               }}
               className="w-24 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
             />
-            <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            <span className="text-sm text-muted-foreground">
               giorni
             </span>
           </div>

@@ -102,7 +102,7 @@ function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) 
 
   return (
     <div className="space-y-4">
-      <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+      <p className="text-sm text-muted-foreground">
         Collega il numero WhatsApp della tua attività: scansiona il QR da
         WhatsApp → Dispositivi collegati → Collega un dispositivo. Consiglio:
         usa un numero già attivo da qualche settimana; i numeri appena
@@ -192,7 +192,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
 
         {step === 1 && (
           <div className="space-y-4">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-sm text-muted-foreground">
               Scegli il settore: imposta tono, prompt e modello del bot.
               Potrai personalizzare tutto dopo.
             </p>
@@ -229,7 +229,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                     </span>
                     <span>
                       <span className="block text-sm font-medium">{p.label}</span>
-                      <span className="block text-xs" style={{ color: "var(--muted-foreground)" }}>
+                      <span className="block text-xs text-muted-foreground">
                         {p.tagline}
                       </span>
                     </span>
@@ -274,7 +274,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
           <div className="space-y-5">
             <div>
               <label className="mb-1 block text-sm font-medium">Nome del bot</label>
-              <p className="mb-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="mb-2 text-xs text-muted-foreground">
                 Come si presenta nei messaggi (es. Sofia, Marco).
               </p>
               <input
@@ -319,7 +319,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
               <label className="mb-1 block text-sm font-medium">
                 Descrizione dell&apos;attività
               </label>
-              <p className="mb-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="mb-2 text-xs text-muted-foreground">
                 L&apos;AI risponde solo su ciò che scrivi qui: servizi, orari,
                 listino essenziale, indirizzo.
               </p>
@@ -340,7 +340,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
 
         {step === 3 && (
           <div className="space-y-5">
-            <p className="flex items-start gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
+            <p className="flex items-start gap-2 text-sm text-muted-foreground">
               <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
               I bot che rispondono solo a chi scrive hanno un rischio ban
               inferiore al 2%. Scegli quanto prudente vuoi essere: nessun
@@ -398,13 +398,13 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                       className="w-full rounded-t-lg bg-primary/70"
                       style={{ height: `${12 + (w.cap / 1000) * 60}px` }}
                     />
-                    <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>
+                    <span className="text-[10px] text-muted-foreground">
                       {w.label}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="mt-2 text-xs text-muted-foreground">
                 Messaggi/giorno consentiti. I limiti crescono da soli: tu non
                 devi fare nulla.
               </p>
@@ -414,7 +414,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
 
         {step === 4 && (
           <div className="space-y-5 text-center">
-            <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-sm text-muted-foreground">
               Fai qualche domanda al bot come farebbe un tuo cliente. Se una
               risposta non ti convince, usa 👎 per correggerla al volo.
             </p>
@@ -447,7 +447,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                   ? "Attivazione…"
                   : `Attiva il bot in modalità ${preset?.recommendedAiMode === "AUTO" ? "Auto" : "Copilot"} 🚀`}
               </button>
-              <p className="mt-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="mt-2 text-xs text-muted-foreground">
                 {preset?.recommendedAiMode === "AUTO"
                   ? "Risponderà da solo. Puoi passare a Copilot (approvi ogni bozza) quando vuoi."
                   : "In Copilot approvi ogni bozza prima dell'invio. Passa ad Auto quando ti fidi."}
@@ -461,8 +461,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
       <div className="flex items-center justify-between">
         <Link
           href="/inbox"
-          className="text-xs underline-offset-2 hover:underline"
-          style={{ color: "var(--muted-foreground)" }}
+          className="text-xs underline-offset-2 hover:underline text-muted-foreground"
         >
           Completa più tardi
         </Link>
