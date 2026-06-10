@@ -20,6 +20,7 @@ import {
   buildSystemPrompt,
   matchEscalationKeyword,
   autoSendAllowedNow,
+  isWithinSchedule,
   styleTemperature,
   lengthMaxTokens,
   type TenantSettings,
@@ -196,15 +197,15 @@ export async function generateAndDeliverReply(
   });
   const dailyCapReached = sentToday >= settings.sending.dailyCap;
 
-  const system = buildSystemPrompt(
-    settings,
-    [
+  const system = buildSystemPrompt(settings, {
+    contactSummary: [
       conversation.contact.name ? `Stai parlando con: ${conversation.contact.name}.` : null,
       conversation.contact.profileSummary,
     ]
       .filter(Boolean)
-      .join("\n")
-  );
+      .join("\n"),
+    outsideBusinessHours: !isWithinSchedule(settings.hours),
+  });
 
   const provider = getProvider({ provider: aiConfig.provider });
   const result = await provider.generate({

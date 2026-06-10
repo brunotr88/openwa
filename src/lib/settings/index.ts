@@ -250,10 +250,22 @@ const LENGTH_LINES: Record<MaxResponseLength, string> = {
  * Ordine: identità (preset) → contesto attività → stile → regole →
  * guardrail → disclosure → istruzioni custom → scheda contatto.
  */
+export interface PromptContext {
+  /** Scheda contatto / note operatore. */
+  contactSummary?: string | null;
+  /** True quando il messaggio arriva fuori dagli orari di attività. */
+  outsideBusinessHours?: boolean;
+}
+
 export function buildSystemPrompt(
   settings: TenantSettings,
-  contactSummary?: string | null
+  contactSummaryOrContext?: string | null | PromptContext
 ): string {
+  const ctx: PromptContext =
+    typeof contactSummaryOrContext === "string" || contactSummaryOrContext == null
+      ? { contactSummary: contactSummaryOrContext }
+      : contactSummaryOrContext;
+  const contactSummary = ctx.contactSummary;
   const { persona, behavior } = settings;
   const preset = getPreset(persona.presetId);
   const parts: string[] = [];
@@ -321,6 +333,16 @@ export function buildSystemPrompt(
   if (behavior.aiDisclosure) {
     parts.push(
       "Nel primo messaggio della conversazione presentati come assistente virtuale (AI) dell'attività."
+    );
+  }
+  if (behavior.welcomeMessageEnabled) {
+    parts.push(
+      "Al primo contatto saluta il cliente e spiega in una frase cosa puoi fare per lui."
+    );
+  }
+  if (ctx.outsideBusinessHours && settings.hours.afterHoursDisclaimer) {
+    parts.push(
+      "In questo momento il team non è disponibile (fuori orario di attività): dillo al cliente con gentilezza e spiega che un operatore risponderà alla riapertura."
     );
   }
 

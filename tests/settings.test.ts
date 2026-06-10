@@ -233,6 +233,19 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Argomenti vietati");
   });
 
+  it("adds the after-hours disclaimer only when outside business hours", () => {
+    const s = settingsWithPreset();
+    const inHours = buildSystemPrompt(s, { outsideBusinessHours: false });
+    const outHours = buildSystemPrompt(s, { outsideBusinessHours: true });
+    expect(inHours).not.toContain("fuori orario di attività");
+    expect(outHours).toContain("fuori orario di attività");
+    // disclaimer disattivato → mai aggiunto
+    const noDisc = { ...s, hours: { ...s.hours, afterHoursDisclaimer: false } };
+    expect(buildSystemPrompt(noDisc, { outsideBusinessHours: true })).not.toContain(
+      "fuori orario di attività"
+    );
+  });
+
   it("uses a generic identity without a preset", () => {
     const s = parseTenantSettings({ persona: { businessName: "ACME" } });
     const prompt = buildSystemPrompt(s);
