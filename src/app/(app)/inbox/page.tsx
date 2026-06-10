@@ -32,8 +32,13 @@ export default async function InboxPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col space-y-4">
-      <h1 className="font-display text-2xl font-semibold">Inbox</h1>
+    <div className="flex h-[calc(100dvh-7rem)] flex-col gap-4 md:h-[calc(100dvh-3.5rem)]">
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Inbox</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Conversazioni WhatsApp, bozze AI e risposte in un unico posto.
+        </p>
+      </div>
       {checklist}
       <InboxClient />
     </div>

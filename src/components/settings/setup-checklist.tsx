@@ -27,22 +27,27 @@ export function SetupChecklist({
   const doneCount = items.filter((i) => i.done).length;
 
   return (
-    <div className="rounded-lg border border-brand-600/40 bg-brand-600/5 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/8 to-accent/8 p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="flex items-center gap-2 text-sm font-semibold">
-            <Rocket size={15} className="text-brand-600" />
-            Completa la configurazione del bot ({doneCount}/{items.length})
+          <p className="flex items-center gap-2 font-display text-sm font-semibold">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-fg">
+              <Rocket size={14} />
+            </span>
+            Completa la configurazione del bot
+            <span className="font-mono text-xs text-muted-foreground">
+              {doneCount}/{items.length}
+            </span>
           </p>
-          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
             {items.map((item) => (
               <li key={item.label} className="flex items-center gap-1.5 text-xs">
                 {item.done ? (
-                  <CheckCircle2 size={13} className="text-green-600" />
+                  <CheckCircle2 size={14} className="text-primary" />
                 ) : (
-                  <Circle size={13} className="opacity-40" />
+                  <Circle size={14} className="opacity-40" />
                 )}
-                <span style={item.done ? { color: "var(--muted-foreground)" } : undefined}>
+                <span className={item.done ? "text-muted-foreground line-through" : ""}>
                   {item.label}
                 </span>
               </li>
@@ -51,7 +56,7 @@ export function SetupChecklist({
         </div>
         <Link
           href="/setup"
-          className="flex items-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-all hover:-translate-y-px hover:bg-primary-hover hover:shadow-md"
         >
           Continua il setup
           <ArrowRight size={14} />

@@ -1,13 +1,16 @@
 "use client";
 
 /**
- * Minimal inbox: conversations list + thread view.
+ * Inbox: conversations list + thread view.
  * - polling refresh ~5s with AbortController
  * - DRAFT bubbles: editable textarea + "Approva e invia"
  * - mode toggle AUTO/COPILOT/MANUAL
  * - manual reply box
+ * Responsive: desktop two-pane (list + thread); mobile single-pane where the
+ * thread replaces the list when a conversation is selected (reuses selectedId).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, MessageSquareDashed, RefreshCw, Send } from "lucide-react";
 import { contactDisplayName, contactPhoneLine } from "@/lib/wa/contact-resolve";
 
 type Mode = "AUTO" | "COPILOT" | "MANUAL";
@@ -52,13 +55,22 @@ interface ThreadData {
 const MODES: Mode[] = ["AUTO", "COPILOT", "MANUAL"];
 
 const MODE_STYLE: Record<Mode, string> = {
-  AUTO: "bg-green-500/15 text-green-600",
-  COPILOT: "bg-amber-500/15 text-amber-600",
-  MANUAL: "bg-gray-500/15 text-gray-500",
+  AUTO: "bg-primary/12 text-success-fg",
+  COPILOT: "bg-accent/18 text-warn-fg",
+  MANUAL: "bg-muted text-muted-foreground",
 };
 
 function contactLabel(c: ContactInfo): string {
   return contactDisplayName(c);
+}
+
+function Avatar({ label }: { label: string }) {
+  const initial = label.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/12 font-display text-sm font-semibold text-primary">
+      {initial}
+    </span>
+  );
 }
 
 function DraftBubble({
@@ -95,22 +107,26 @@ function DraftBubble({
   }
 
   return (
-    <div className="ml-auto w-full max-w-md space-y-2 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
-      <p className="text-xs font-medium text-amber-600">Bozza AI — da approvare</p>
+    <div className="ml-auto w-full max-w-md space-y-2 rounded-2xl rounded-br-md border-2 border-dashed border-accent/60 bg-accent/10 p-3.5 shadow-sm">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-warn-fg">
+        <MessageSquareDashed size={14} />
+        Bozza AI — da approvare
+      </p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={3}
-        className="w-full rounded-md border bg-transparent px-2 py-1 text-sm"
+        className="w-full resize-none rounded-xl border border-border bg-surface px-3 py-2 text-base md:text-sm"
       />
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <button
         type="button"
         onClick={approve}
         disabled={busy || !text.trim()}
-        className="rounded-md bg-brand-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+        className="flex min-h-[40px] items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-fg shadow-sm transition-all hover:bg-primary-hover disabled:opacity-60"
       >
-        {busy ? "Invio..." : "Approva e invia"}
+        <Send size={13} />
+        {busy ? "Invio…" : "Approva e invia"}
       </button>
     </div>
   );
@@ -119,9 +135,11 @@ function DraftBubble({
 function Thread({
   conversationId,
   onChanged,
+  onBack,
 }: {
   conversationId: string;
   onChanged: () => void;
+  onBack?: () => void;
 }) {
   const [thread, setThread] = useState<ThreadData | null>(null);
   const [reply, setReply] = useState("");
@@ -207,31 +225,50 @@ function Thread({
 
   if (!thread) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-        Caricamento...
+      <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <RefreshCw size={15} className="animate-spin" />
+        Caricamento…
       </div>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between border-b pb-3">
-        <div>
-          <p className="font-medium">{contactLabel(thread.contact)}</p>
-          {contactPhoneLine(thread.contact) && (
-            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {contactPhoneLine(thread.contact)}
-            </p>
+      {/* Contact header */}
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Torna alla lista"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted md:hidden"
+            >
+              <ArrowLeft size={18} />
+            </button>
           )}
+          <Avatar label={contactLabel(thread.contact)} />
+          <div className="min-w-0">
+            <p className="truncate font-display font-semibold">
+              {contactLabel(thread.contact)}
+            </p>
+            {contactPhoneLine(thread.contact) && (
+              <p className="truncate font-mono text-xs text-muted-foreground">
+                {contactPhoneLine(thread.contact)}
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex gap-1">
+        <div className="flex shrink-0 gap-1">
           {MODES.map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`rounded-full px-2 py-1 text-xs font-medium ${
-                thread.mode === m ? MODE_STYLE[m] : "opacity-50 hover:opacity-100"
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                thread.mode === m
+                  ? MODE_STYLE[m]
+                  : "text-muted-foreground opacity-60 hover:bg-muted hover:opacity-100"
               }`}
             >
               {m}
@@ -240,7 +277,8 @@ function Thread({
         </div>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto py-4">
+      {/* Messages */}
+      <div className="flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
         {thread.messages.map((m) =>
           m.status === "DRAFT" ? (
             <DraftBubble
@@ -254,20 +292,14 @@ function Thread({
           ) : (
             <div
               key={m.id}
-              className={`w-fit max-w-md rounded-lg px-3 py-2 text-sm ${
+              className={`w-fit max-w-[85%] rounded-2xl px-3.5 py-2 text-sm shadow-sm md:max-w-md ${
                 m.direction === "IN"
-                  ? "mr-auto border"
-                  : "ml-auto bg-brand-600 text-white"
+                  ? "mr-auto rounded-bl-md border border-border bg-surface text-ink"
+                  : "ml-auto rounded-br-md bg-primary/12 text-ink dark:bg-primary/20"
               }`}
-              style={m.direction === "IN" ? { background: "var(--muted)" } : undefined}
             >
               <p className="whitespace-pre-wrap break-words">{m.body}</p>
-              <p
-                className={`mt-1 text-[10px] ${
-                  m.direction === "IN" ? "" : "text-white/70"
-                }`}
-                style={m.direction === "IN" ? { color: "var(--muted-foreground)" } : undefined}
-              >
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                 {new Date(m.createdAt).toLocaleTimeString("it-IT", {
                   hour: "2-digit",
                   minute: "2-digit",
@@ -281,23 +313,28 @@ function Thread({
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={sendManual} className="flex gap-2 border-t pt-3">
+      {/* Composer */}
+      <form
+        onSubmit={sendManual}
+        className="flex items-center gap-2 border-t border-border px-3 py-3"
+      >
         <input
           type="text"
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          placeholder="Scrivi una risposta..."
-          className="flex-1 rounded-md border bg-transparent px-3 py-2 text-sm"
+          placeholder="Scrivi una risposta…"
+          className="flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-base shadow-sm transition-colors focus:border-primary/50 md:text-sm"
         />
         <button
           type="submit"
           disabled={busy || !reply.trim()}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          aria-label="Invia"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg shadow-sm transition-all hover:bg-primary-hover disabled:opacity-50"
         >
-          {busy ? "..." : "Invia"}
+          <Send size={17} />
         </button>
       </form>
-      {error && <p className="pt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="px-4 pb-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -330,19 +367,16 @@ function ResolveContactsButton({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex items-center gap-2">
+      {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       <button
         type="button"
         onClick={run}
         disabled={busy}
-        className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-brand-600/5 disabled:opacity-60"
+        className="flex min-h-[40px] items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/60 disabled:opacity-60"
       >
-        {busy ? "Aggiornamento..." : "Aggiorna nomi/numeri"}
+        <RefreshCw size={13} className={busy ? "animate-spin" : ""} />
+        {busy ? "Aggiornamento…" : "Aggiorna nomi/numeri"}
       </button>
-      {msg && (
-        <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-          {msg}
-        </span>
-      )}
     </div>
   );
 }
@@ -385,51 +419,78 @@ export function InboxClient() {
       <div className="flex justify-end">
         <ResolveContactsButton onDone={() => void refresh()} />
       </div>
-      <div className="flex min-h-0 flex-1 gap-4">
-      <aside className="w-72 shrink-0 overflow-y-auto rounded-lg border">
-        {conversations.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setSelectedId(c.id)}
-            className={`block w-full border-b px-3 py-3 text-left hover:bg-brand-600/5 ${
-              selectedId === c.id ? "bg-brand-600/10" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-sm font-medium">{contactLabel(c.contact)}</p>
-              <span
-                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${MODE_STYLE[c.mode]}`}
-              >
-                {c.mode}
-              </span>
-            </div>
-            <p className="mt-1 truncate text-xs" style={{ color: "var(--muted-foreground)" }}>
-              {c.lastMessage?.status === "DRAFT" && "✎ Bozza: "}
-              {c.lastMessage?.body ?? "—"}
-            </p>
-          </button>
-        ))}
-        {loaded && conversations.length === 0 && (
-          <p className="p-4 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Nessuna conversazione.
-          </p>
-        )}
-      </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col rounded-lg border p-4">
-        {selectedId ? (
-          <Thread
-            key={selectedId}
-            conversationId={selectedId}
-            onChanged={() => void refresh()}
-          />
-        ) : (
-          <div className="flex flex-1 items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-            Seleziona una conversazione.
-          </div>
-        )}
-      </section>
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+        {/* Conversation list — hidden on mobile when a thread is open */}
+        <aside
+          className={`w-full shrink-0 overflow-y-auto border-border md:w-[360px] md:border-r ${
+            selectedId ? "hidden md:block" : "block"
+          }`}
+        >
+          {conversations.map((c) => {
+            const active = selectedId === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedId(c.id)}
+                className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-muted/50 ${
+                  active ? "bg-primary/8" : ""
+                }`}
+              >
+                <Avatar label={contactLabel(c.contact)} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate font-medium">
+                      {contactLabel(c.contact)}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${MODE_STYLE[c.mode]}`}
+                    >
+                      {c.mode}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {c.lastMessage?.status === "DRAFT" && (
+                      <span className="font-semibold text-warn-fg">✎ Bozza: </span>
+                    )}
+                    {c.lastMessage?.body ?? "—"}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+          {loaded && conversations.length === 0 && (
+            <p className="p-8 text-center text-sm text-muted-foreground">
+              Nessuna conversazione.
+            </p>
+          )}
+        </aside>
+
+        {/* Thread — full screen on mobile when selected */}
+        <section
+          className={`min-w-0 flex-1 flex-col ${
+            selectedId ? "flex" : "hidden md:flex"
+          }`}
+        >
+          {selectedId ? (
+            <Thread
+              key={selectedId}
+              conversationId={selectedId}
+              onChanged={() => void refresh()}
+              onBack={() => setSelectedId(null)}
+            />
+          ) : (
+            <div className="hidden flex-1 flex-col items-center justify-center gap-3 p-8 text-center md:flex">
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <Send size={22} />
+              </span>
+              <p className="text-sm text-muted-foreground">
+                Seleziona una conversazione per iniziare.
+              </p>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
