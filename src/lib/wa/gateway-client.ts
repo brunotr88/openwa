@@ -12,6 +12,9 @@
  *          body: { chatId: "39333...@c.us", text }
  * - POST   /api/sessions/{id}/webhooks                   → webhook
  *          body: { url, events, secret?, headers?, retryCount? }
+ * - GET    /api/sessions/{id}/contacts/{contactId}       → contact
+ *          contactId MUST include its suffix (e.g. "1273...@lid" / "39...@c.us")
+ *          → { id:"39...@c.us", pushName, number, isMyContact, isBlocked }
  */
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -54,6 +57,20 @@ export interface GatewayWebhook {
   url: string;
   events: string[];
   active: boolean;
+}
+
+/**
+ * Contact as returned by GET /api/sessions/{id}/contacts/{contactId}.
+ * - `id`     = real phone number in `<number>@c.us` form (the actual phone).
+ * - `pushName` = the contact's display name.
+ * - `number` = the @lid digits (NOT a real number — ignore for display).
+ */
+export interface GatewayContact {
+  id?: string;
+  pushName?: string;
+  number?: string;
+  isMyContact?: boolean;
+  isBlocked?: boolean;
 }
 
 /** Typed error for any non-2xx gateway response or network/timeout failure. */
@@ -165,6 +182,32 @@ export async function sendText(
     body: { chatId, text },
     timeoutMs: 30_000,
   });
+}
+
+/**
+ * Resolve a contact's real name + phone via the gateway.
+ *
+ * `contactId` MUST include its original WhatsApp suffix
+ * (e.g. "127345813942417@lid" or "393478435299@c.us"); calling without a
+ * suffix returns HTTP 500 from the gateway. Resolution may legitimately fail
+ * for privacy-restricted contacts — this never throws and returns `null` on
+ * any error, non-200, missing config, or timeout, so callers (webhook,
+ * backfill) can keep their existing fallback behaviour.
+ */
+export async function getContact(
+  gatewaySessionId: string,
+  contactId: string,
+  timeoutMs = 8_000
+): Promise<GatewayContact | null> {
+  try {
+    const data = await gwFetch<GatewayContact>(
+      `/api/sessions/${gatewaySessionId}/contacts/${encodeURIComponent(contactId)}`,
+      { timeoutMs }
+    );
+    return data ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
