@@ -24,42 +24,12 @@ import {
   RESPONSE_LENGTH_MAX_TOKENS,
 } from "./defaults";
 import { getPreset } from "./presets";
+import { deepMerge, isPlainObject, parseTenantSettings } from "./merge";
 
 export * from "./schema";
 export * from "./defaults";
 export * from "./presets";
-
-// ─── Deep merge (oggetti plain; gli array vengono sostituiti) ────────────────
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-export function deepMerge<T>(base: T, patch: unknown): T {
-  if (!isPlainObject(base) || !isPlainObject(patch)) {
-    return (patch === undefined ? base : (patch as T)) as T;
-  }
-  const out: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) continue;
-    const current = (base as Record<string, unknown>)[key];
-    out[key] =
-      isPlainObject(current) && isPlainObject(value)
-        ? deepMerge(current, value)
-        : value;
-  }
-  return out as T;
-}
-
-/** Parsa un JSON parziale/sporco in TenantSettings completo (mai throw). */
-export function parseTenantSettings(stored: unknown): TenantSettings {
-  const merged = deepMerge(
-    recommendedDefaults,
-    isPlainObject(stored) ? stored : {}
-  );
-  const parsed = tenantSettingsSchema.safeParse(merged);
-  return parsed.success ? parsed.data : recommendedDefaults;
-}
+export * from "./merge";
 
 // ─── Load / save ─────────────────────────────────────────────────────────────
 

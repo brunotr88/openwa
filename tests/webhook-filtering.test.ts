@@ -19,7 +19,8 @@ vi.mock("../src/lib/wa/reply", () => ({
   generateAndDeliverReply: mockGenerateReply,
 }));
 
-import { POST, shouldIgnoreInbound } from "../src/app/api/webhooks/wa/route";
+import { POST } from "../src/app/api/webhooks/wa/route";
+import { shouldIgnoreInbound } from "../src/lib/wa/inbound-filter";
 import { recommendedDefaults, parseTenantSettings } from "../src/lib/settings";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
