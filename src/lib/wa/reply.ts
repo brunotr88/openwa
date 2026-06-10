@@ -337,7 +337,7 @@ export async function generateAndDeliverReply(
       throw new Error(`WaSession ${conversation.sessionId} has no gateway session ref`);
     }
     await humanDelay(settings);
-    await sendText(gwSessionId, conversation.contact.waId, text);
+    await sendText(gwSessionId, conversation.contact.phone ?? conversation.contact.waId, text);
     await db.message.update({
       where: { id: message.id },
       data: { status: "SENT" },

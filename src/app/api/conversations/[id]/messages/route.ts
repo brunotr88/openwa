@@ -52,7 +52,7 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
   try {
     await sendText(
       conversation.session.sessionDataRef,
-      conversation.contact.waId,
+      conversation.contact.phone ?? conversation.contact.waId,
       parsed.data.body
     );
   } catch (e) {
