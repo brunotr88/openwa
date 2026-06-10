@@ -16,7 +16,7 @@ export async function GET(): Promise<Response> {
     orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }],
     take: 100,
     include: {
-      contact: { select: { id: true, waId: true, name: true } },
+      contact: { select: { id: true, waId: true, name: true, phone: true } },
       messages: {
         orderBy: { createdAt: "desc" },
         take: 1,

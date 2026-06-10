@@ -24,7 +24,7 @@ export async function GET(_req: Request, { params }: Params): Promise<Response> 
   const conversation = await db.conversation.findFirst({
     where: { id, deletedAt: null },
     include: {
-      contact: { select: { id: true, waId: true, name: true } },
+      contact: { select: { id: true, waId: true, name: true, phone: true } },
       messages: {
         orderBy: { createdAt: "asc" },
         take: 200,

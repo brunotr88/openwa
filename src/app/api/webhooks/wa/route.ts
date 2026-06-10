@@ -27,6 +27,8 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { generateAndDeliverReply } from "@/lib/wa/reply";
 import { shouldIgnoreInbound, normalizeWaId } from "@/lib/wa/inbound-filter";
+import { getContact } from "@/lib/wa/gateway-client";
+import { mapGatewayContact, resolutionPatch } from "@/lib/wa/contact-resolve";
 import { getTenantSettings } from "@/lib/settings";
 import type { WaSessionStatus } from "@prisma/client";
 
@@ -91,6 +93,9 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
   const settings = await getTenantSettings(session.tenantId);
   if (shouldIgnoreInbound(data, settings)) return;
 
+  // Original chat id WITH its suffix (@lid / @c.us / @s.whatsapp.net) — needed
+  // to resolve the real name/number via the gateway. waId is the stable,
+  // suffix-stripped matching key (unchanged, so message matching still works).
   const chatId = typeof data.chatId === "string" ? data.chatId : String(data.from ?? "");
   const body = typeof data.body === "string" ? data.body : "";
   const isGroup = data.isGroup === true || chatId.endsWith("@g.us");
@@ -108,6 +113,26 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     },
     update: pushName ? { name: pushName } : {},
   });
+
+  // Resolve the REAL name + phone behind the @lid privacy id. One extra gateway
+  // call, guarded so the webhook always responds fast and never fails on it.
+  // Skip for groups (no per-contact resolution) and when not connected.
+  if (!isGroup && session.sessionDataRef) {
+    try {
+      const resolved = mapGatewayContact(
+        await getContact(session.sessionDataRef, chatId)
+      );
+      const patch = resolutionPatch(resolved, {
+        name: contact.name,
+        phone: contact.phone,
+      });
+      if (Object.keys(patch).length > 0) {
+        await db.contact.update({ where: { id: contact.id }, data: patch });
+      }
+    } catch (e) {
+      console.error("[webhook/wa] contact resolution failed:", e);
+    }
+  }
 
   // Tenant default mode from TenantSettings.behavior.aiMode.
   // Gruppi: MAI auto-reply (default) — solo se sending.groupAutoReply è ON.
