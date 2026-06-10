@@ -23,7 +23,9 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/login") ||
         nextUrl.pathname.startsWith("/api/auth");
       const isPublicApi =
-        nextUrl.pathname.startsWith("/api/health");
+        nextUrl.pathname.startsWith("/api/health") ||
+        // Gateway webhook receiver — authenticated via HMAC signature, not session.
+        nextUrl.pathname.startsWith("/api/webhooks/wa");
 
       if (isAuthRoute || isPublicApi) return true;
       if (isLoggedIn) return true;
