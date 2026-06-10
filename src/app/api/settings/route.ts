@@ -5,6 +5,7 @@
  *      + audit log (changed sections in meta).
  */
 import { ZodError } from "zod";
+import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
 import { getActor, resolveTenantId } from "@/lib/authz";
 import {
@@ -26,7 +27,20 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const settings = await getTenantSettings(tenantId);
-  return Response.json({ tenantId, settings });
+
+  // Trasparenza sui limiti: "Oggi: X/cap messaggi inviati".
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const sentToday = await db.message.count({
+    where: {
+      tenantId,
+      direction: "OUT",
+      status: { in: ["SENT", "DELIVERED", "READ"] },
+      createdAt: { gte: startOfDay },
+    },
+  });
+
+  return Response.json({ tenantId, settings, sentToday });
 }
 
 function changedSections(before: TenantSettings, after: TenantSettings): string[] {

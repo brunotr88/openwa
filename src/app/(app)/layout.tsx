@@ -4,7 +4,7 @@
  */
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Inbox, Smartphone, LogOut } from "lucide-react";
+import { Inbox, Smartphone, Settings, LogOut } from "lucide-react";
 import { auth, signOut } from "@/lib/auth";
 
 export default async function AppLayout({
@@ -39,6 +39,13 @@ export default async function AppLayout({
           >
             <Smartphone size={16} />
             Sessioni
+          </Link>
+          <Link
+            href="/settings"
+            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-brand-600/10"
+          >
+            <Settings size={16} />
+            Impostazioni
           </Link>
         </nav>
 
