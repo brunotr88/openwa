@@ -8,12 +8,15 @@ import {
   BedrockRuntimeClient,
   ConverseCommand,
   InvokeModelCommand,
+  type ContentBlock as BedrockContentBlock,
   type Message,
+  type Tool,
 } from "@aws-sdk/client-bedrock-runtime";
 import type {
   AiProvider,
   GenerateInput,
   GenerateResult,
+  ToolCall,
 } from "./provider";
 
 const EMBED_MODEL_ID = "amazon.titan-embed-text-v2:0";
@@ -48,7 +51,10 @@ export class BedrockProvider implements AiProvider {
   async generate(input: GenerateInput): Promise<GenerateResult> {
     const messages: Message[] = input.messages.map((m) => ({
       role: m.role,
-      content: [{ text: m.content }],
+      content:
+        typeof m.content === "string"
+          ? [{ text: m.content }]
+          : (m.content as BedrockContentBlock[]),
     }));
 
     // Inject RAG/correction context (Fase 2) as a trailing system block.
@@ -56,6 +62,17 @@ export class BedrockProvider implements AiProvider {
     if (input.context) {
       systemBlocks.push({ text: input.context });
     }
+
+    // Tool use (M5): declare tools via toolConfig when provided.
+    const tools: Tool[] | undefined = input.tools?.length
+      ? input.tools.map((t) => ({
+          toolSpec: {
+            name: t.name,
+            description: t.description,
+            inputSchema: { json: t.inputSchema as never },
+          },
+        }))
+      : undefined;
 
     const res = await this.client.send(
       new ConverseCommand({
@@ -66,15 +83,36 @@ export class BedrockProvider implements AiProvider {
           maxTokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
           temperature: input.temperature ?? 0.5,
         },
+        ...(tools ? { toolConfig: { tools } } : {}),
       })
     );
 
+    const blocks = res.output?.message?.content ?? [];
+    const text = blocks
+      .map((b) => b.text ?? "")
+      .filter(Boolean)
+      .join("\n");
+
+    // stopReason tool_use → return the requested tool invocations.
+    let toolCalls: ToolCall[] | undefined;
+    if (res.stopReason === "tool_use") {
+      toolCalls = blocks
+        .filter((b) => b.toolUse?.toolUseId && b.toolUse.name)
+        .map((b) => ({
+          id: b.toolUse!.toolUseId as string,
+          name: b.toolUse!.name as string,
+          input: (b.toolUse!.input ?? {}) as Record<string, unknown>,
+        }));
+      if (toolCalls.length === 0) toolCalls = undefined;
+    }
+
     return {
-      text: res.output?.message?.content?.[0]?.text ?? "",
+      text,
       usage: {
         inputTokens: res.usage?.inputTokens ?? 0,
         outputTokens: res.usage?.outputTokens ?? 0,
       },
+      ...(toolCalls ? { toolCalls } : {}),
     };
   }
 

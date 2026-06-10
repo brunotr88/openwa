@@ -4,8 +4,18 @@
 import type { AiProvider } from "./provider";
 import { BedrockProvider } from "./bedrock";
 
-export type { AiProvider, ChatMsg, TokenUsage, GenerateInput, GenerateResult } from "./provider";
+export type {
+  AiProvider,
+  ChatMsg,
+  ContentBlock,
+  TokenUsage,
+  GenerateInput,
+  GenerateResult,
+  ToolSpec,
+  ToolCall,
+} from "./provider";
 export { BedrockProvider } from "./bedrock";
+export { runWithTools, type ToolExecutor, type ToolExecutors } from "./tool-loop";
 
 export interface AiConfigLike {
   provider: "BEDROCK" | "OPENAI";

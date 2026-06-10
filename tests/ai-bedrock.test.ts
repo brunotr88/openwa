@@ -98,6 +98,93 @@ describe("BedrockProvider.generate", () => {
     expect(result.text).toBe("");
     expect(result.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
   });
+
+  it("passes toolConfig and returns toolCalls on stopReason tool_use (M5)", async () => {
+    send.mockResolvedValue({
+      stopReason: "tool_use",
+      output: {
+        message: {
+          content: [
+            { text: "Controllo la disponibilità…" },
+            {
+              toolUse: {
+                toolUseId: "tu-1",
+                name: "check_availability",
+                input: { date: "2026-06-15" },
+              },
+            },
+          ],
+        },
+      },
+      usage: { inputTokens: 50, outputTokens: 20 },
+    });
+
+    const provider = new BedrockProvider();
+    const schema = {
+      type: "object",
+      properties: { date: { type: "string" } },
+    };
+    const result = await provider.generate({
+      system: "s",
+      messages: [
+        { role: "user", content: "Avete posto lunedì?" },
+        {
+          role: "user",
+          content: [
+            {
+              toolResult: {
+                toolUseId: "prev",
+                content: [{ json: { ok: true } }],
+                status: "success",
+              },
+            },
+          ],
+        },
+      ],
+      modelId: "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+      tools: [
+        {
+          name: "check_availability",
+          description: "Controlla gli orari liberi",
+          inputSchema: schema,
+        },
+      ],
+    });
+
+    expect(result.toolCalls).toEqual([
+      { id: "tu-1", name: "check_availability", input: { date: "2026-06-15" } },
+    ]);
+    expect(result.text).toBe("Controllo la disponibilità…");
+
+    const cmd = send.mock.calls[0][0] as { input: any };
+    expect(cmd.input.toolConfig.tools).toEqual([
+      {
+        toolSpec: {
+          name: "check_availability",
+          description: "Controlla gli orari liberi",
+          inputSchema: { json: schema },
+        },
+      },
+    ]);
+    // block-style messages pass through unchanged
+    expect(cmd.input.messages[1].content[0].toolResult.toolUseId).toBe("prev");
+  });
+
+  it("omits toolConfig when no tools are declared", async () => {
+    send.mockResolvedValue({
+      output: { message: { content: [{ text: "ok" }] } },
+      usage: { inputTokens: 1, outputTokens: 1 },
+    });
+    const provider = new BedrockProvider();
+    const result = await provider.generate({
+      system: "s",
+      messages: [{ role: "user", content: "ciao" }],
+      modelId: "eu.amazon.nova-micro-v1:0",
+    });
+    expect(result.toolCalls).toBeUndefined();
+    const cmd = send.mock.calls[0][0] as { input: any };
+    expect(cmd.input.toolConfig).toBeUndefined();
+  });
 });
 
 describe("BedrockProvider.embed", () => {
