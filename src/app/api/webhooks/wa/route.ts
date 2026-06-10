@@ -8,14 +8,25 @@
  *   { event, timestamp, sessionId, idempotencyKey, deliveryId, data }
  *
  * Events handled:
- * - message.received → upsert Contact, find/create OPEN Conversation,
- *   Message(IN, RECEIVED, WA), then fire-and-forget reply pipeline
+ * - message.received → JID/type filtering (whatsapp-ops.md), upsert Contact,
+ *   find/create OPEN Conversation, Message(IN, RECEIVED, WA), then
+ *   fire-and-forget reply pipeline
  * - session.status / session.authenticated / session.disconnected →
  *   map gateway status onto WaSession.status
+ *
+ * Inbox filtering (whatsapp-ops.md):
+ * - status@broadcast, *@newsletter, *@broadcast → IGNORA
+ * - reazioni, protocol/e2e_notification/notification_template/gp2/call/
+ *   ciphertext → IGNORA
+ * - *@g.us (gruppi) → memorizza ma MAI auto-reply (salvo settings
+ *   sending.groupAutoReply); inbox.filterGroups "ignora" → scarta
+ * - *@lid → contatto normale, waId senza suffisso
+ * - fromMe → IGNORA (loop!)
  */
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { generateAndDeliverReply } from "@/lib/wa/reply";
+import { getTenantSettings, type TenantSettings } from "@/lib/settings";
 import type { WaSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -65,22 +76,59 @@ function mapGatewayStatus(status: string): WaSessionStatus | null {
   }
 }
 
-/** Strip @c.us / @s.whatsapp.net suffix to get a bare wa id (phone). */
+/**
+ * Strip @c.us / @s.whatsapp.net / @lid suffix to get a bare wa id.
+ * @lid (Linked ID) is privacy-preserving but stable → usable as contact key;
+ * group ids keep their @g.us suffix (stable group key).
+ */
 function normalizeWaId(chatId: string): string {
-  return chatId.replace(/@(c\.us|s\.whatsapp\.net)$/, "");
+  return chatId.replace(/@(c\.us|s\.whatsapp\.net|lid)$/, "");
+}
+
+/** Message types never processed (system/protocol noise — whatsapp-ops.md). */
+const IGNORED_TYPES = new Set([
+  "reaction",
+  "message_reaction",
+  "e2e_notification",
+  "notification",
+  "notification_template",
+  "protocol",
+  "protocol_message",
+  "revoked",
+  "gp2",
+  "call_log",
+  "call",
+  "ciphertext",
+  "broadcast_notification",
+]);
+
+/** Pure JID/type filter — true when the event must be skipped entirely. */
+export function shouldIgnoreInbound(
+  data: Record<string, unknown>,
+  settings: TenantSettings
+): boolean {
+  if (data.fromMe === true) return true; // echo dei propri invii → loop!
+
+  const type = typeof data.type === "string" ? data.type : "";
+  if (IGNORED_TYPES.has(type)) return true;
+
+  const chatId =
+    typeof data.chatId === "string" ? data.chatId : String(data.from ?? "");
+  if (!chatId) return true;
+
+  if (chatId === "status@broadcast" && settings.inbox.filterStatusBroadcast) return true;
+  if (chatId.endsWith("@newsletter") && settings.inbox.filterNewsletter) return true;
+  // Liste broadcast ([timestamp]@broadcast) — include status@broadcast.
+  if (chatId.endsWith("@broadcast")) return true;
+
+  const isGroup = data.isGroup === true || chatId.endsWith("@g.us");
+  if (isGroup && settings.inbox.filterGroups === "ignora") return true;
+
+  return false;
 }
 
 async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
   const data = envelope.data ?? {};
-  const fromMe = data.fromMe === true;
-  const isGroup =
-    data.isGroup === true ||
-    (typeof data.chatId === "string" && data.chatId.endsWith("@g.us"));
-  if (fromMe || isGroup) return;
-
-  const chatId = typeof data.chatId === "string" ? data.chatId : String(data.from ?? "");
-  const body = typeof data.body === "string" ? data.body : "";
-  if (!chatId) return;
 
   const session = await db.waSession.findFirst({
     where: { sessionDataRef: envelope.sessionId, deletedAt: null },
@@ -89,6 +137,13 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     console.warn(`[webhook/wa] no WaSession for gateway session ${envelope.sessionId}`);
     return;
   }
+
+  const settings = await getTenantSettings(session.tenantId);
+  if (shouldIgnoreInbound(data, settings)) return;
+
+  const chatId = typeof data.chatId === "string" ? data.chatId : String(data.from ?? "");
+  const body = typeof data.body === "string" ? data.body : "";
+  const isGroup = data.isGroup === true || chatId.endsWith("@g.us");
 
   const waId = normalizeWaId(chatId);
   const pushName =
@@ -104,11 +159,16 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     update: pushName ? { name: pushName } : {},
   });
 
-  // Tenant default mode: AUTO if autoReplyEnabled, else COPILOT.
-  const aiConfig = await db.aiConfig.findUnique({
-    where: { tenantId: session.tenantId },
-  });
-  const defaultMode = aiConfig?.autoReplyEnabled ? "AUTO" : "COPILOT";
+  // Tenant default mode from TenantSettings.behavior.aiMode.
+  // Gruppi: MAI auto-reply (default) — solo se sending.groupAutoReply è ON.
+  const tenantMode =
+    settings.behavior.aiMode === "AUTO"
+      ? "AUTO"
+      : settings.behavior.aiMode === "COPILOT"
+        ? "COPILOT"
+        : "MANUAL";
+  const defaultMode =
+    isGroup && !settings.sending.groupAutoReply ? "MANUAL" : tenantMode;
 
   let conversation = await db.conversation.findFirst({
     where: {
@@ -153,7 +213,9 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
   });
 
   // Reply pipeline — fire-and-forget so the gateway gets a fast 200.
-  if (conversation.mode !== "MANUAL") {
+  // I gruppi non attivano MAI l'AI salvo opt-in esplicito (groupAutoReply).
+  const groupBlocked = isGroup && !settings.sending.groupAutoReply;
+  if (conversation.mode !== "MANUAL" && !groupBlocked) {
     const conversationId = conversation.id;
     void generateAndDeliverReply(conversationId).catch((e) => {
       console.error(`[webhook/wa] reply pipeline failed for ${conversationId}:`, e);

@@ -6,7 +6,8 @@ const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
     conversation: { findUnique: vi.fn(), update: vi.fn() },
     aiConfig: { findUnique: vi.fn() },
-    message: { create: vi.fn(), update: vi.fn() },
+    message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    tenant: { findUnique: vi.fn(), update: vi.fn() },
   },
   mockSendText: vi.fn(),
   mockGenerate: vi.fn(),
@@ -39,12 +40,27 @@ function conversationFixture(mode: "AUTO" | "COPILOT" | "MANUAL") {
       profileSummary: "Cliente abituale, preferisce risposte brevi.",
     },
     session: { id: "wa1", sessionDataRef: "gw-uuid" },
-    // newest-first, as returned by orderBy createdAt desc
-    messages: [
-      { direction: "IN", body: "Avete disponibilità?", status: "RECEIVED", createdAt: new Date() },
-      { direction: "OUT", body: "Buongiorno!", status: "SENT", createdAt: new Date() },
-    ],
   };
+}
+
+// newest-first, as returned by orderBy createdAt desc
+function historyFixture() {
+  return [
+    {
+      direction: "IN",
+      body: "Avete disponibilità?",
+      status: "RECEIVED",
+      aiGenerated: false,
+      createdAt: new Date(),
+    },
+    {
+      direction: "OUT",
+      body: "Buongiorno!",
+      status: "SENT",
+      aiGenerated: false,
+      createdAt: new Date(),
+    },
+  ];
 }
 
 function aiConfigFixture(overrides: Record<string, unknown> = {}) {
@@ -60,12 +76,27 @@ function aiConfigFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** Tenant settings: bot attivo in AUTO, niente delay nei test. */
+function tenantSettingsFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    settings: {
+      persona: { businessName: "Il Negozio" },
+      behavior: { aiMode: "AUTO" },
+      sending: { randomDelay: false },
+      ...overrides,
+    },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockGenerate.mockResolvedValue({
     text: "Sì, abbiamo disponibilità!",
     usage: { inputTokens: 10, outputTokens: 5 },
   });
+  mockDb.tenant.findUnique.mockResolvedValue(tenantSettingsFixture());
+  mockDb.message.findMany.mockResolvedValue(historyFixture());
+  mockDb.message.count.mockResolvedValue(0);
   mockDb.message.create.mockResolvedValue({ id: "out1" });
   mockDb.message.update.mockResolvedValue({});
   mockDb.conversation.update.mockResolvedValue({});
@@ -113,16 +144,45 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
   });
 
-  it("builds the prompt from tenant systemPrompt + contact profileSummary", async () => {
+  it("builds the prompt from tenant settings + contact profileSummary", async () => {
     await generateAndDeliverReply("conv1");
     const input = mockGenerate.mock.calls[0][0];
-    expect(input.system).toContain("Sei l'assistente del negozio.");
+    expect(input.system).toContain("Il Negozio");
     expect(input.system).toContain("Cliente abituale, preferisce risposte brevi.");
+    expect(input.system).toContain("Stai parlando con: Mario Rossi.");
     // history oldest-first ending with the user message
     expect(input.messages[input.messages.length - 1]).toEqual({
       role: "user",
       content: "Avete disponibilità?",
     });
+  });
+
+  it("uses responseStyle temperature and maxResponseLength maxTokens", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        behavior: {
+          aiMode: "AUTO",
+          responseStyle: "creativo",
+          maxResponseLength: "lunga",
+        },
+      })
+    );
+    await generateAndDeliverReply("conv1");
+    const input = mockGenerate.mock.calls[0][0];
+    expect(input.temperature).toBe(0.7);
+    expect(input.maxTokens).toBe(1024);
+  });
+
+  it("respects the historyMessages window", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        behavior: { aiMode: "AUTO", historyMessages: 5 },
+      })
+    );
+    await generateAndDeliverReply("conv1");
+    expect(mockDb.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 5 })
+    );
   });
 
   it("marks the message FAILED when the gateway send throws", async () => {
@@ -137,9 +197,9 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
   });
 
-  it("falls back to DRAFT when tenant autoReplyEnabled is false", async () => {
-    mockDb.aiConfig.findUnique.mockResolvedValue(
-      aiConfigFixture({ autoReplyEnabled: false })
+  it("falls back to DRAFT when tenant aiMode is COPILOT", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({ behavior: { aiMode: "COPILOT" } })
     );
     await generateAndDeliverReply("conv1");
     expect(mockSendText).not.toHaveBeenCalled();
@@ -150,13 +210,24 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
   });
 
-  it("falls back to DRAFT outside business hours", async () => {
-    // Sunday 2026-06-14 12:00 — days [1..5] excludes it
+  it("does nothing when tenant aiMode is OFF", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({ behavior: { aiMode: "OFF" } })
+    );
+    const id = await generateAndDeliverReply("conv1");
+    expect(id).toBeNull();
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockDb.message.create).not.toHaveBeenCalled();
+  });
+
+  it("drafts during business hours when afterHoursMode is ai_fuori_orario", async () => {
+    // Wednesday 2026-06-10 10:30 UTC — inside default Mon-Fri 09-19 schedule
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 5, 14, 12, 0, 0));
-    mockDb.aiConfig.findUnique.mockResolvedValue(
-      aiConfigFixture({
-        businessHours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] },
+    vi.setSystemTime(new Date(Date.UTC(2026, 5, 10, 10, 30, 0)));
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        behavior: { aiMode: "AUTO" },
+        hours: { afterHoursMode: "ai_fuori_orario", timezone: "UTC" },
       })
     );
     await generateAndDeliverReply("conv1");
@@ -168,17 +239,34 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
   });
 
-  it("sends in AUTO inside business hours", async () => {
-    // Wednesday 2026-06-10 10:30
+  it("sends outside business hours when afterHoursMode is ai_fuori_orario", async () => {
+    // Wednesday 2026-06-10 22:00 UTC — outside default schedule
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(2026, 5, 10, 10, 30, 0));
-    mockDb.aiConfig.findUnique.mockResolvedValue(
-      aiConfigFixture({
-        businessHours: { start: "09:00", end: "18:00", days: [1, 2, 3, 4, 5] },
+    vi.setSystemTime(new Date(Date.UTC(2026, 5, 10, 22, 0, 0)));
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        behavior: { aiMode: "AUTO" },
+        hours: { afterHoursMode: "ai_fuori_orario", timezone: "UTC" },
       })
     );
     await generateAndDeliverReply("conv1");
     expect(mockSendText).toHaveBeenCalled();
+  });
+
+  it("never auto-sends when afterHoursMode is solo_assenza", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        behavior: { aiMode: "AUTO" },
+        hours: { afterHoursMode: "solo_assenza" },
+      })
+    );
+    await generateAndDeliverReply("conv1");
+    expect(mockSendText).not.toHaveBeenCalled();
+    expect(mockDb.message.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "DRAFT" }),
+      })
+    );
   });
 });
 
@@ -231,17 +319,22 @@ describe("generateAndDeliverReply — MANUAL / edge cases", () => {
   });
 
   it("does nothing when the last message is not from the user", async () => {
-    const conv = conversationFixture("AUTO");
-    conv.messages = [
-      { direction: "OUT", body: "Grazie!", status: "SENT", createdAt: new Date() },
-    ];
-    mockDb.conversation.findUnique.mockResolvedValue(conv);
+    mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
     mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.message.findMany.mockResolvedValue([
+      {
+        direction: "OUT",
+        body: "Grazie!",
+        status: "SENT",
+        aiGenerated: false,
+        createdAt: new Date(),
+      },
+    ]);
     expect(await generateAndDeliverReply("conv1")).toBeNull();
   });
 });
 
-// ── isWithinBusinessHours ────────────────────────────────────────────────────
+// ── isWithinBusinessHours (legacy AiConfig.businessHours) ────────────────────
 
 describe("isWithinBusinessHours", () => {
   it("returns true when no business hours are configured", () => {

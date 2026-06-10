@@ -7,7 +7,7 @@ const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
   mockDb: {
     waSession: { findFirst: vi.fn(), update: vi.fn() },
     contact: { upsert: vi.fn() },
-    aiConfig: { findUnique: vi.fn() },
+    tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     message: { create: vi.fn() },
   },
@@ -76,7 +76,10 @@ beforeEach(() => {
   });
   mockDb.waSession.update.mockResolvedValue({});
   mockDb.contact.upsert.mockResolvedValue({ id: "c1", tenantId: "t1", waId: "393331234567" });
-  mockDb.aiConfig.findUnique.mockResolvedValue({ tenantId: "t1", autoReplyEnabled: true });
+  // TenantSettings: bot attivo in AUTO
+  mockDb.tenant.findUnique.mockResolvedValue({
+    settings: { behavior: { aiMode: "AUTO" } },
+  });
   mockDb.conversation.findFirst.mockResolvedValue(null);
   mockDb.conversation.create.mockResolvedValue({ id: "conv1", mode: "AUTO" });
   mockDb.conversation.update.mockResolvedValue({});
@@ -167,10 +170,9 @@ describe("POST /api/webhooks/wa — message.received", () => {
     expect(mockGenerateReply).toHaveBeenCalledWith("conv1");
   });
 
-  it("defaults to COPILOT when autoReplyEnabled is false", async () => {
-    mockDb.aiConfig.findUnique.mockResolvedValue({
-      tenantId: "t1",
-      autoReplyEnabled: false,
+  it("defaults to COPILOT when tenant aiMode is COPILOT", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue({
+      settings: { behavior: { aiMode: "COPILOT" } },
     });
     await POST(makeRequest(messageReceivedEnvelope()));
     expect(mockDb.conversation.create).toHaveBeenCalledWith(
@@ -195,14 +197,22 @@ describe("POST /api/webhooks/wa — message.received", () => {
     expect(mockGenerateReply).not.toHaveBeenCalled();
   });
 
-  it("ignores group messages", async () => {
+  it("stores group messages with mode MANUAL and never triggers the AI", async () => {
     const res = await POST(
       makeRequest(
         messageReceivedEnvelope({ isGroup: true, chatId: "12345-67890@g.us" })
       )
     );
     expect(res.status).toBe(200);
-    expect(mockDb.message.create).not.toHaveBeenCalled();
+    // memorizzato (default inbox.filterGroups = mostra_no_ai)…
+    expect(mockDb.conversation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ mode: "MANUAL" }),
+      })
+    );
+    expect(mockDb.message.create).toHaveBeenCalled();
+    // …ma MAI auto-reply
+    expect(mockGenerateReply).not.toHaveBeenCalled();
   });
 
   it("returns 200 even when no WaSession matches the gateway session id", async () => {
