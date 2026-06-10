@@ -89,6 +89,7 @@ model Tenant {
   name      String
   slug      String       @unique
   status    TenantStatus @default(ACTIVE)
+  settings  Json?        // TenantSettings (src/lib/settings/schema.ts) — merged over recommendedDefaults
   createdAt DateTime     @default(now())
   deletedAt DateTime?
 
