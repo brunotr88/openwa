@@ -82,7 +82,13 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "no tenant available" }, { status: 400 });
   }
 
-  const appUrl = process.env.APP_URL || process.env.NEXTAUTH_URL;
+  // Prefer the internal callback URL (gateway → web over the Docker network):
+  // avoids Traefik/proxy/hairpin/TLS, so webhook delivery is reliable even while
+  // the public proxy is recreating. Falls back to the public URL.
+  const appUrl =
+    process.env.WEBHOOK_CALLBACK_URL ||
+    process.env.APP_URL ||
+    process.env.NEXTAUTH_URL;
   const webhookSecret = process.env.WA_WEBHOOK_SECRET;
 
   let gwId: string | null = null;
