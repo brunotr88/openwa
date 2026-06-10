@@ -334,6 +334,61 @@ describe("generateAndDeliverReply — MANUAL / edge cases", () => {
   });
 });
 
+// ── Appuntamenti (M5) ────────────────────────────────────────────────────────
+
+describe("generateAndDeliverReply — appointments wiring", () => {
+  beforeEach(() => {
+    mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
+    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+  });
+
+  it("calendly_link: appends the link instruction to the system prompt, no tools", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        appointments: {
+          provider: "calendly_link",
+          calendlyUrl: "https://calendly.com/negozio/30min",
+        },
+      })
+    );
+    await generateAndDeliverReply("conv1");
+    const input = mockGenerate.mock.calls[0][0];
+    expect(input.system).toContain(
+      "condividi questo link: https://calendly.com/negozio/30min"
+    );
+    expect(input.tools).toBeUndefined();
+  });
+
+  it("google_calendar: runs the tool-loop with check_availability/book_appointment", async () => {
+    mockDb.tenant.findUnique.mockResolvedValue(
+      tenantSettingsFixture({
+        appointments: {
+          provider: "google_calendar",
+          googleCalendarId: "cal@group.calendar.google.com",
+        },
+      })
+    );
+    await generateAndDeliverReply("conv1");
+    const input = mockGenerate.mock.calls[0][0];
+    expect(input.system).toContain("Prenotazione appuntamenti");
+    expect(input.tools?.map((t: { name: string }) => t.name)).toEqual([
+      "check_availability",
+      "book_appointment",
+    ]);
+    // tetto token alzato per le tool call
+    expect(input.maxTokens).toBeGreaterThanOrEqual(600);
+    // la risposta finale viene comunque inviata
+    expect(mockSendText).toHaveBeenCalled();
+  });
+
+  it("provider nessuno (default): plain generate without tools", async () => {
+    await generateAndDeliverReply("conv1");
+    const input = mockGenerate.mock.calls[0][0];
+    expect(input.tools).toBeUndefined();
+    expect(input.system).not.toContain("Prenotazione appuntamenti");
+  });
+});
+
 // ── isWithinBusinessHours (legacy AiConfig.businessHours) ────────────────────
 
 describe("isWithinBusinessHours", () => {

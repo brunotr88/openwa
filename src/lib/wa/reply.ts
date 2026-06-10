@@ -15,6 +15,12 @@
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
 import { getProvider, type ChatMsg } from "@/lib/ai";
+import { runWithTools } from "@/lib/ai/tool-loop";
+import { getCalendarProvider } from "@/lib/appointments";
+import {
+  appointmentSystemPrompt,
+  buildAppointmentTools,
+} from "@/lib/appointments/tools";
 import {
   getTenantSettings,
   buildSystemPrompt,
@@ -176,7 +182,8 @@ export async function generateAndDeliverReply(
   }
 
   // ── Escalation guards (force DRAFT even in AUTO) ──────────────────────────
-  const lastInbound = history[history.length - 1].content;
+  const lastContent = history[history.length - 1].content;
+  const lastInbound = typeof lastContent === "string" ? lastContent : "";
   const matchedKeyword = matchEscalationKeyword(
     lastInbound,
     settings.behavior.escalationKeywords
@@ -197,7 +204,7 @@ export async function generateAndDeliverReply(
   });
   const dailyCapReached = sentToday >= settings.sending.dailyCap;
 
-  const system = buildSystemPrompt(settings, {
+  let system = buildSystemPrompt(settings, {
     contactSummary: [
       conversation.contact.name ? `Stai parlando con: ${conversation.contact.name}.` : null,
       conversation.contact.profileSummary,
@@ -207,21 +214,14 @@ export async function generateAndDeliverReply(
     outsideBusinessHours: !isWithinSchedule(settings.hours),
   });
 
-  const provider = getProvider({ provider: aiConfig.provider });
-  const result = await provider.generate({
-    system,
-    messages: history,
-    modelId: aiConfig.modelId,
-    temperature: styleTemperature(settings.behavior.responseStyle),
-    maxTokens: lengthMaxTokens(settings.behavior.maxResponseLength),
-  });
-
-  const text = result.text.trim();
-  if (!text) return null;
+  // Appuntamenti (M5): istruzioni nel prompt (Calendly link o tool Google).
+  const apptPrompt = appointmentSystemPrompt(settings);
+  if (apptPrompt) system = `${system}\n\n${apptPrompt}`;
 
   // AUTO requires: conversation AUTO + tenant aiMode AUTO + afterHoursMode
   // allows it now + no escalation guard tripped. Otherwise degrade to
-  // COPILOT behaviour (draft for the operator).
+  // COPILOT behaviour (draft for the operator). Computed BEFORE generation:
+  // the booking tool must not create real events for un-approved drafts.
   const autoAllowed =
     conversation.mode === "AUTO" &&
     settings.behavior.aiMode === "AUTO" &&
@@ -229,6 +229,60 @@ export async function generateAndDeliverReply(
     !matchedKeyword &&
     !maxTurnsReached &&
     !dailyCapReached;
+
+  const provider = getProvider({ provider: aiConfig.provider });
+  const generateInput = {
+    system,
+    messages: history,
+    modelId: aiConfig.modelId,
+    temperature: styleTemperature(settings.behavior.responseStyle),
+    maxTokens: lengthMaxTokens(settings.behavior.maxResponseLength),
+  };
+
+  // Appuntamenti Google (M5): tool-loop con check_availability/book_appointment.
+  const calendar = getCalendarProvider(settings);
+  let result;
+  if (calendar) {
+    const { tools, executors } = buildAppointmentTools({
+      settings,
+      calendar,
+      allowBooking: autoAllowed,
+      contact: {
+        name: conversation.contact.name,
+        phone: conversation.contact.waId,
+      },
+      onBooked: (booked) =>
+        auditLog({
+          tenantId: conversation.tenantId,
+          action: "appointment.created",
+          entity: "CalendarEvent",
+          entityId: booked.eventId,
+          meta: {
+            conversationId: conversation.id,
+            contactId: conversation.contact.id,
+            start: booked.start.toISOString(),
+            end: booked.end.toISOString(),
+            title: booked.title,
+            ...(booked.htmlLink ? { htmlLink: booked.htmlLink } : {}),
+          },
+        }),
+    });
+    result = await runWithTools(
+      provider,
+      {
+        ...generateInput,
+        // Le tool call consumano token extra: alza il tetto minimo.
+        maxTokens: Math.max(generateInput.maxTokens, 600),
+        tools,
+      },
+      executors
+    );
+  } else {
+    result = await provider.generate(generateInput);
+  }
+
+  const text = result.text.trim();
+  if (!text) return null;
 
   if (!autoAllowed) {
     const draft = await db.message.create({
