@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   BookOpen,
+  CalendarCheck,
   CalendarClock,
   Inbox,
   MessageCircle,
@@ -46,6 +47,7 @@ const NAV: Array<{ group: string; items: NavItem[] }> = [
     group: "Conversazioni",
     items: [
       { label: "Orari e disponibilità", href: "/settings/conversazioni/orari", icon: <CalendarClock size={15} /> },
+      { label: "Appuntamenti", href: "/settings/conversazioni/appuntamenti", icon: <CalendarCheck size={15} /> },
       { label: "Invio e protezione numero", href: "/settings/conversazioni/invio", icon: <ShieldCheck size={15} /> },
       { label: "Preferenze Inbox", href: "/settings/conversazioni/inbox", icon: <Inbox size={15} /> },
     ],
