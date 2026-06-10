@@ -5,67 +5,17 @@
  * tono, registro, emoji, lingua). Helper text dalle tabelle di ricerca.
  */
 import { useState } from "react";
-import {
-  BedDouble,
-  Dumbbell,
-  Home,
-  Scale,
-  ShoppingCart,
-  Sparkles,
-  UtensilsCrossed,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
 import { BUSINESS_PRESETS, getPreset } from "@/lib/settings/presets";
-import type { Tone } from "@/lib/settings/schema";
 import { useSettings } from "@/components/settings/settings-context";
 import { SettingRow, SettingsCard } from "@/components/settings/setting-row";
 import { SegmentedControl } from "@/components/settings/segmented-control";
 import { AdviceCallout } from "@/components/settings/advice-callout";
 import { RecommendedBadge } from "@/components/settings/recommended-badge";
-
-const PRESET_ICONS: Record<string, LucideIcon> = {
-  UtensilsCrossed,
-  ShoppingCart,
-  Scale,
-  Sparkles,
-  Home,
-  Wrench,
-  BedDouble,
-  Dumbbell,
-};
-
-const TONE_OPTIONS: Array<{
-  value: Tone;
-  label: string;
-  description: string;
-  preview: string;
-}> = [
-  {
-    value: "professionale",
-    label: "Professionale",
-    description: "Cortese e diretto",
-    preview: "Buongiorno! Certo, posso aiutarti subito con la tua richiesta.",
-  },
-  {
-    value: "amichevole",
-    label: "Amichevole",
-    description: "Caloroso e informale",
-    preview: "Ciao! 😊 Certo, ti aiuto volentieri: dimmi pure!",
-  },
-  {
-    value: "entusiasta",
-    label: "Entusiasta",
-    description: "Energico e motivante",
-    preview: "Ciao! Che bello sentirti 💪 Ti racconto subito tutto!",
-  },
-  {
-    value: "formale",
-    label: "Formale (Lei)",
-    description: "Sobrio e istituzionale",
-    preview: "Buongiorno. La ringrazio per averci contattato: resto a disposizione.",
-  },
-];
+import {
+  PRESET_ICONS,
+  FALLBACK_PRESET_ICON,
+  TONE_OPTIONS,
+} from "@/components/settings/persona-options";
 
 function TextField({
   value,
@@ -128,7 +78,7 @@ export default function ProfiloPage() {
       >
         <div className="grid gap-3 py-3 sm:grid-cols-2">
           {BUSINESS_PRESETS.map((p) => {
-            const Icon = PRESET_ICONS[p.icon] ?? Sparkles;
+            const Icon = PRESET_ICONS[p.icon] ?? FALLBACK_PRESET_ICON;
             const active = persona.presetId === p.id;
             return (
               <button

@@ -32,7 +32,7 @@ function StatusBadge({ status }: { status: SessionItem["status"] }) {
   );
 }
 
-function QrPanel({
+export function QrPanel({
   sessionId,
   onConnected,
 }: {
