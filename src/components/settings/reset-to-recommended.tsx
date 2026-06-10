@@ -66,17 +66,16 @@ export function ResetToRecommended({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-brand-600/10"
+        className="flex min-h-[40px] items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/60"
       >
         <RotateCcw size={13} />
         Ripristina consigliati
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
           <div
-            className="w-full max-w-md space-y-4 rounded-lg border p-5 shadow-xl"
-            style={{ background: "var(--background)" }}
+            className="ow-rise w-full max-w-md space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-lg"
             role="dialog"
             aria-modal="true"
           >
@@ -84,7 +83,7 @@ export function ResetToRecommended({
               Ripristinare la configurazione consigliata?
             </h3>
             {diffs.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+              <p className="text-sm text-muted-foreground">
                 Questa pagina usa già la configurazione consigliata.
               </p>
             ) : (
@@ -92,11 +91,14 @@ export function ResetToRecommended({
                 {diffs.map((d) => (
                   <div
                     key={`${d.section}.${d.field}`}
-                    className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-border px-3 py-2"
                   >
                     <span className="font-medium">{d.field}</span>
-                    <span style={{ color: "var(--muted-foreground)" }}>
-                      {formatValue(d.from)} → <span className="font-medium text-green-600">{formatValue(d.to)}</span>
+                    <span className="text-muted-foreground">
+                      {formatValue(d.from)} →{" "}
+                      <span className="font-semibold text-success-fg">
+                        {formatValue(d.to)}
+                      </span>
                     </span>
                   </div>
                 ))}
@@ -106,7 +108,7 @@ export function ResetToRecommended({
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border px-3 py-2 text-sm hover:bg-brand-600/10"
+                className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/60"
               >
                 Annulla
               </button>
@@ -115,7 +117,7 @@ export function ResetToRecommended({
                   type="button"
                   onClick={reset}
                   disabled={busy}
-                  className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-60"
                 >
                   {busy ? "Ripristino…" : "Ripristina"}
                 </button>

@@ -44,41 +44,39 @@ export function ScheduleEditor({
         return (
           <div
             key={i}
-            className={`flex items-center gap-3 rounded-md px-2 py-2 ${
-              day.enabled ? "" : "opacity-50"
+            className={`flex flex-wrap items-center gap-3 rounded-xl px-2 py-2 transition-opacity ${
+              day.enabled ? "" : "opacity-55"
             }`}
           >
             <Switch checked={day.enabled} onChange={(v) => update(i, { enabled: v })} />
-            <span className="w-24 text-sm">{DAY_LABELS[i]}</span>
+            <span className="w-24 text-sm font-medium">{DAY_LABELS[i]}</span>
             {day.enabled ? (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <input
                   type="time"
                   value={day.start}
                   onChange={(e) => update(i, { start: e.target.value })}
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  className="rounded-xl border border-border bg-surface px-2.5 py-1.5 font-mono text-sm shadow-sm focus:border-primary/50"
                 />
-                <span style={{ color: "var(--muted-foreground)" }}>–</span>
+                <span className="text-muted-foreground">–</span>
                 <input
                   type="time"
                   value={day.end}
                   onChange={(e) => update(i, { end: e.target.value })}
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  className="rounded-xl border border-border bg-surface px-2.5 py-1.5 font-mono text-sm shadow-sm focus:border-primary/50"
                 />
                 <button
                   type="button"
                   onClick={() => copyToAll(i)}
                   title="Copia questo orario su tutti i giorni"
-                  className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-brand-600/10"
+                  className="flex items-center gap-1 rounded-xl border border-border px-2.5 py-1.5 text-xs transition-colors hover:border-primary/40 hover:bg-primary/10"
                 >
                   <Copy size={12} />
                   Copia su tutti
                 </button>
               </div>
             ) : (
-              <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                Chiuso
-              </span>
+              <span className="text-sm text-muted-foreground">Chiuso</span>
             )}
           </div>
         );

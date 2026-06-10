@@ -49,7 +49,7 @@ export default function GeneralePage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-2xl font-semibold">Generale</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Generale</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
           Stato della configurazione del workspace.
         </p>
@@ -64,10 +64,10 @@ export default function GeneralePage() {
             <li key={item.label}>
               <Link
                 href={item.href}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-brand-600/5"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-primary/5"
               >
                 {item.done ? (
-                  <CheckCircle2 size={16} className="shrink-0 text-green-600" />
+                  <CheckCircle2 size={16} className="shrink-0 text-primary" />
                 ) : (
                   <Circle size={16} className="shrink-0 opacity-40" />
                 )}

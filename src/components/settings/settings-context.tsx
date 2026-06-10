@@ -92,18 +92,17 @@ export function SaveToast() {
   const { saveState } = useSettings();
   if (saveState === "idle") return null;
   const styles: Record<Exclude<SaveState, "idle">, { text: string; cls: string }> = {
-    saving: { text: "Salvataggio…", cls: "bg-gray-500/15 text-gray-500" },
-    saved: { text: "Salvato ✓", cls: "bg-green-500/15 text-green-600" },
-    error: { text: "Errore di salvataggio — modifica annullata", cls: "bg-red-500/15 text-red-600" },
+    saving: { text: "Salvataggio…", cls: "text-muted-foreground" },
+    saved: { text: "Salvato ✓", cls: "text-success-fg" },
+    error: { text: "Errore di salvataggio — modifica annullata", cls: "text-danger" },
   };
   const s = styles[saveState];
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 rounded-full px-4 py-2 text-sm font-medium shadow ${s.cls}`}
-      style={{ background: "var(--muted)" }}
+      className="ow-fade fixed bottom-20 right-4 z-50 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold shadow-lg md:bottom-6 md:right-6"
       role="status"
     >
-      <span className={`rounded-full px-2 py-0.5 ${s.cls}`}>{s.text}</span>
+      <span className={s.cls}>{s.text}</span>
     </div>
   );
 }

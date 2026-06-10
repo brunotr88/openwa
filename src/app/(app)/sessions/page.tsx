@@ -39,7 +39,14 @@ export default async function SessionsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="font-display text-2xl font-semibold">Sessioni WhatsApp</h1>
+      <div>
+        <h1 className="font-display text-2xl font-bold tracking-tight">
+          Sessioni WhatsApp
+        </h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Collega e gestisci i numeri WhatsApp del tuo workspace.
+        </p>
+      </div>
       <SessionsClient initialSessions={items} />
     </div>
   );

@@ -42,8 +42,8 @@ function TextField({
       onBlur={() => {
         if (local !== value) onCommit(local.trim());
       }}
-      className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm ${
-        invalid ? "border-red-500" : ""
+      className={`w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm ${
+        invalid ? "border-danger" : ""
       }`}
     />
   );
@@ -80,7 +80,7 @@ function NumberField({
           if (n !== value) onCommit(n);
           setLocal(String(n));
         }}
-        className="w-24 rounded-md border bg-transparent px-3 py-2 text-sm"
+        className="w-24 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
       />
       <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
         {unit}
@@ -113,12 +113,12 @@ function CalendlyUrlField({
           const v = local.trim();
           if (v !== value && (v === "" || CALENDLY_URL_RE.test(v))) onCommit(v);
         }}
-        className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm ${
-          invalid ? "border-red-500" : ""
+        className={`w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm ${
+          invalid ? "border-danger" : ""
         }`}
       />
       {invalid && (
-        <p className="mt-1 text-xs text-red-600">
+        <p className="mt-1 text-xs text-danger">
           URL non valido: deve iniziare con https:// (es. https://calendly.com/tuonome).
         </p>
       )}
@@ -177,7 +177,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold">Appuntamenti</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Appuntamenti</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
             Come l&apos;AI gestisce le richieste di appuntamento dei clienti su WhatsApp.
           </p>
@@ -301,7 +301,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
                 type="button"
                 onClick={() => void verifyConnection()}
                 disabled={verifying}
-                className="inline-flex items-center gap-2 rounded-md border border-brand-600 px-3 py-2 text-sm font-medium text-brand-600 hover:bg-brand-600/5 disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-md border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 disabled:opacity-60"
               >
                 {verifying ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -313,7 +313,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
               {verifyResult && (
                 <p
                   className={`flex items-start gap-1.5 text-xs ${
-                    verifyResult.ok ? "text-green-600" : "text-red-600"
+                    verifyResult.ok ? "text-primary" : "text-danger"
                   }`}
                 >
                   {verifyResult.ok ? (

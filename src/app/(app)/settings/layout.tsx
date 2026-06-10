@@ -20,7 +20,7 @@ export default async function SettingsLayout({
   const tenantId = await resolveTenantId(actor);
   if (!tenantId) {
     return (
-      <div className="mx-auto max-w-xl py-12 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+      <div className="mx-auto max-w-xl py-12 text-center text-sm text-muted-foreground">
         Nessun workspace disponibile per questo utente.
       </div>
     );

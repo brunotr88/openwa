@@ -46,7 +46,7 @@ function SliderSetting({
           onMouseUp={() => local !== value && onCommit(local)}
           onTouchEnd={() => local !== value && onCommit(local)}
           onKeyUp={() => local !== value && onCommit(local)}
-          className="w-64 accent-[oklch(52%_0.20_250)]"
+          className="w-64 accent-primary"
         />
         <span className="w-16 text-sm font-medium">
           {local} {unit}
@@ -67,7 +67,7 @@ export default function ComportamentoPage() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold">Comportamento risposte</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Comportamento risposte</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
             Come risponde il bot e quando passa la conversazione a un umano.
           </p>
@@ -245,7 +245,7 @@ export default function ComportamentoPage() {
           <button
             type="button"
             onClick={() => setAdvancedOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-brand-600/5"
+            className="flex w-full min-h-[44px] items-center justify-between rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/50"
           >
             <span className="font-medium">Istruzioni avanzate (per utenti esperti)</span>
             <ChevronDown size={15} className={advancedOpen ? "rotate-180" : ""} />
@@ -269,7 +269,7 @@ export default function ComportamentoPage() {
                 rows={6}
                 maxLength={4000}
                 placeholder="Istruzioni aggiuntive per l'AI…"
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
               />
               <p className="text-right text-xs" style={{ color: "var(--muted-foreground)" }}>
                 {customDraft.length}/4000

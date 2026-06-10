@@ -34,7 +34,7 @@ function TextField({
   const commit = () => {
     if (local !== value) onCommit(local);
   };
-  const cls = "w-full rounded-md border bg-transparent px-3 py-2 text-sm";
+  const cls = "w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm";
   return textarea ? (
     <textarea
       value={local}
@@ -66,7 +66,7 @@ export default function ProfiloPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-2xl font-semibold">Profilo e persona</h1>
+        <h1 className="font-display text-2xl font-bold tracking-tight">Profilo e persona</h1>
         <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
           Chi è il tuo assistente: settore, identità e stile di comunicazione.
         </p>
@@ -96,13 +96,13 @@ export default function ProfiloPage() {
                   })
                 }
                 aria-pressed={active}
-                className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
-                  active ? "border-brand-600 bg-brand-600/10" : "hover:bg-brand-600/5"
+                className={`flex items-start gap-3 rounded-2xl border border-border p-3 text-left transition-all ${
+                  active ? "border-primary bg-primary/10 shadow-sm" : "hover:border-primary/40 hover:bg-muted/50"
                 }`}
               >
                 <span
                   className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
-                    active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"
+                    active ? "bg-primary text-primary-fg" : "bg-primary/10 text-primary"
                   }`}
                 >
                   <Icon size={16} />
@@ -188,8 +188,8 @@ export default function ProfiloPage() {
                   type="button"
                   aria-pressed={active}
                   onClick={() => void save({ persona: { tone: t.value } })}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
-                    active ? "border-brand-600 bg-brand-600/10" : "hover:bg-brand-600/5"
+                  className={`rounded-2xl border border-border p-3 text-left transition-all ${
+                    active ? "border-primary bg-primary/10 shadow-sm" : "hover:border-primary/40 hover:bg-muted/50"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export default function ProfiloPage() {
                   <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
                     {t.description}
                   </p>
-                  <p className="mt-2 rounded-md bg-green-600/10 px-2 py-1.5 text-xs italic">
+                  <p className="mt-2 rounded-md bg-primary/10 px-2 py-1.5 text-xs italic">
                     “{t.preview}”
                   </p>
                 </button>
@@ -247,7 +247,7 @@ export default function ProfiloPage() {
           <select
             value={persona.language}
             onChange={(e) => void save({ persona: { language: e.target.value } })}
-            className="rounded-md border bg-transparent px-3 py-2 text-sm"
+            className="rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
           >
             <option value="it">Italiano</option>
             <option value="en">English</option>

@@ -106,23 +106,23 @@ export function BotPlayground({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30">
+    <div className="fixed inset-0 z-50 flex justify-end bg-ink/30 backdrop-blur-sm">
       <div
-        className="flex h-full w-full max-w-md flex-col border-l shadow-xl"
-        style={{ background: "var(--background)" }}
+        className="ow-fade flex h-full w-full max-w-md flex-col border-l border-border shadow-lg"
+        style={{ background: "var(--bg)" }}
         role="dialog"
         aria-modal="true"
         aria-label="Prova il bot"
       >
         {/* Header stile WhatsApp */}
-        <div className="flex items-center justify-between gap-2 border-b bg-brand-600/10 px-4 py-3">
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-primary/10 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-fg">
               <Bot size={18} />
             </span>
             <div>
-              <p className="text-sm font-semibold">{botName}</p>
-              <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+              <p className="font-display text-sm font-semibold">{botName}</p>
+              <p className="text-xs text-muted-foreground">
                 {busy ? "sta scrivendo…" : "Anteprima — nessun messaggio reale"}
               </p>
             </div>
@@ -131,16 +131,16 @@ export function BotPlayground({
             type="button"
             onClick={onClose}
             aria-label="Chiudi playground"
-            className="rounded-md p-1.5 hover:bg-brand-600/10"
+            className="grid h-9 w-9 place-items-center rounded-xl text-muted-foreground hover:bg-primary/10"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Thread */}
-        <div className="flex-1 space-y-3 overflow-y-auto p-4" style={{ background: "var(--muted)" }}>
+        <div className="flex-1 space-y-3 overflow-y-auto bg-muted p-4">
           {messages.length === 0 && (
-            <p className="py-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+            <p className="py-8 text-center text-sm text-muted-foreground">
               Scrivi come farebbe un tuo cliente: il bot risponde con le
               impostazioni correnti (anche non salvate).
             </p>
@@ -148,12 +148,12 @@ export function BotPlayground({
 
           {messages.map((m, i) =>
             m.role === "user" ? (
-              <div key={i} className="mr-12 w-fit max-w-[85%] rounded-lg rounded-tl-none border bg-white px-3 py-2 text-sm text-gray-900 shadow-sm dark:bg-gray-200">
+              <div key={i} className="mr-12 w-fit max-w-[85%] rounded-2xl rounded-tl-md border border-border bg-surface px-3 py-2 text-sm text-ink shadow-sm">
                 {m.content}
               </div>
             ) : (
               <div key={i} className="ml-12 space-y-1">
-                <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-lg rounded-tr-none bg-green-600/90 px-3 py-2 text-sm text-white shadow-sm">
+                <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-tr-md bg-primary px-3 py-2 text-sm text-primary-fg shadow-sm">
                   {m.content}
                   <span className="ml-2 align-bottom text-[10px] opacity-75">✓✓</span>
                 </div>
@@ -162,7 +162,7 @@ export function BotPlayground({
                     type="button"
                     aria-label="Risposta buona"
                     onClick={() => feedback(i, "up")}
-                    className={`rounded-md p-1 ${m.feedback === "up" ? "bg-green-500/20 text-green-600" : "opacity-50 hover:opacity-100"}`}
+                    className={`rounded-lg p-1.5 ${m.feedback === "up" ? "bg-primary/20 text-success-fg" : "opacity-50 hover:opacity-100"}`}
                   >
                     <ThumbsUp size={13} />
                   </button>
@@ -170,14 +170,14 @@ export function BotPlayground({
                     type="button"
                     aria-label="Risposta da correggere"
                     onClick={() => feedback(i, "down")}
-                    className={`rounded-md p-1 ${m.feedback === "down" ? "bg-red-500/20 text-red-600" : "opacity-50 hover:opacity-100"}`}
+                    className={`rounded-lg p-1.5 ${m.feedback === "down" ? "bg-danger/20 text-danger" : "opacity-50 hover:opacity-100"}`}
                   >
                     <ThumbsDown size={13} />
                   </button>
                 </div>
                 {fixIndex === i && (
-                  <div className="ml-auto w-full max-w-[85%] space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
-                    <p className="text-xs font-medium text-amber-600">
+                  <div className="ml-auto w-full max-w-[85%] space-y-2 rounded-xl border border-accent/45 bg-accent/12 p-2.5">
+                    <p className="text-xs font-semibold text-warn-fg">
                       Correggi il bot: aggiungi una regola &quot;da non fare&quot;
                     </p>
                     <input
@@ -185,20 +185,20 @@ export function BotPlayground({
                       value={fixRule}
                       onChange={(e) => setFixRule(e.target.value)}
                       maxLength={300}
-                      className="w-full rounded-md border bg-transparent px-2 py-1.5 text-xs"
+                      className="w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs"
                     />
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={addDontRule}
-                        className="rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white"
+                        className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-fg"
                       >
                         Aggiungi regola
                       </button>
                       <button
                         type="button"
                         onClick={() => setFixIndex(null)}
-                        className="rounded-md border px-2 py-1 text-xs"
+                        className="rounded-lg border border-border px-2.5 py-1.5 text-xs"
                       >
                         Annulla
                       </button>
@@ -210,23 +210,23 @@ export function BotPlayground({
           )}
 
           {busy && (
-            <div className="ml-auto w-fit rounded-lg bg-green-600/40 px-3 py-2 text-sm text-white">
+            <div className="ml-auto w-fit rounded-2xl rounded-tr-md bg-primary/50 px-3 py-2 text-sm text-primary-fg">
               <span className="animate-pulse">sta scrivendo…</span>
             </div>
           )}
-          {error && <p className="text-center text-xs text-red-500">{error}</p>}
+          {error && <p className="text-center text-xs text-danger">{error}</p>}
           <div ref={bottomRef} />
         </div>
 
         {/* Chip domande di esempio */}
         {preset && messages.length === 0 && (
-          <div className="flex flex-wrap gap-1.5 border-t px-4 py-2">
+          <div className="flex flex-wrap gap-1.5 border-t border-border px-4 py-2">
             {preset.exampleQuestions.map((q) => (
               <button
                 key={q}
                 type="button"
                 onClick={() => void send(q)}
-                className="rounded-full border border-dashed px-3 py-1 text-xs hover:bg-brand-600/10"
+                className="rounded-full border border-dashed border-border px-3 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-primary/10"
               >
                 {q}
               </button>
@@ -240,7 +240,7 @@ export function BotPlayground({
             e.preventDefault();
             void send(draft);
           }}
-          className="flex gap-2 border-t p-3"
+          className="flex gap-2 border-t border-border p-3"
         >
           <input
             type="text"
@@ -248,13 +248,13 @@ export function BotPlayground({
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Scrivi come un cliente…"
             maxLength={2000}
-            className="flex-1 rounded-full border bg-transparent px-4 py-2 text-sm"
+            className="flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
           />
           <button
             type="submit"
             disabled={busy || !draft.trim()}
             aria-label="Invia"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-white disabled:opacity-50"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-50"
           >
             <Send size={15} />
           </button>

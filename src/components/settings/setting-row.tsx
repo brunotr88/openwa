@@ -24,22 +24,24 @@ export function SettingRow({
 }) {
   return (
     <div
-      className={`flex gap-4 border-b py-4 last:border-b-0 ${
-        stacked ? "flex-col" : "items-center justify-between"
+      className={`flex gap-4 border-b border-border py-4 last:border-b-0 ${
+        stacked
+          ? "flex-col"
+          : "flex-col sm:flex-row sm:items-center sm:justify-between"
       }`}
     >
       <div className="min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium">{label}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold">{label}</p>
           {recommended && <RecommendedBadge />}
         </div>
         {description && (
-          <p className="text-xs leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+          <p className="text-xs leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}
       </div>
-      {children && <div className={stacked ? "" : "shrink-0"}>{children}</div>}
+      {children && <div className={stacked ? "" : "sm:shrink-0"}>{children}</div>}
     </div>
   );
 }
@@ -57,12 +59,12 @@ export function SettingsCard({
   actions?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border p-5" style={{ background: "var(--muted)" }}>
-      <div className="mb-2 flex items-start justify-between gap-3">
+    <section className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-display text-base font-semibold">{title}</h2>
           {description && (
-            <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {description}
             </p>
           )}

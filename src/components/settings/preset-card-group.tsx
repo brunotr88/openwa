@@ -36,12 +36,14 @@ export function PresetCardGroup<V extends string>({
             type="button"
             onClick={() => onChange(o.value)}
             aria-pressed={active}
-            className={`relative rounded-lg border p-4 text-left transition-colors ${
-              active ? "border-brand-600 bg-brand-600/10" : "hover:bg-brand-600/5"
+            className={`relative rounded-2xl border p-4 text-left transition-all ${
+              active
+                ? "border-primary bg-primary/10 shadow-sm"
+                : "border-border hover:border-primary/40 hover:bg-muted/50"
             }`}
           >
             {active && (
-              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 text-white">
+              <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-fg">
                 <Check size={12} />
               </span>
             )}
@@ -50,15 +52,13 @@ export function PresetCardGroup<V extends string>({
               {o.recommended && <RecommendedBadge />}
             </div>
             {o.subtitle && (
-              <p className="mt-1 text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {o.subtitle}
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{o.subtitle}</p>
             )}
             <dl className="mt-3 space-y-1">
               {o.values.map((v) => (
                 <div key={v.label} className="flex justify-between gap-2 text-xs">
-                  <dt style={{ color: "var(--muted-foreground)" }}>{v.label}</dt>
-                  <dd className="font-medium">{v.value}</dd>
+                  <dt className="text-muted-foreground">{v.label}</dt>
+                  <dd className="font-mono font-medium">{v.value}</dd>
                 </div>
               ))}
             </dl>

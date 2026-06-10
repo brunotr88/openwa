@@ -91,9 +91,9 @@ function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) 
 
   if (connected) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/10 p-8">
-        <CheckCircle2 size={32} className="text-green-600" />
-        <p className="text-sm font-medium text-green-600">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-8">
+        <CheckCircle2 size={32} className="text-primary" />
+        <p className="text-sm font-medium text-primary">
           WhatsApp collegato! Puoi passare al prossimo step.
         </p>
       </div>
@@ -117,12 +117,12 @@ function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) 
             maxLength={100}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Etichetta numero (es. Principale)"
-            className="flex-1 rounded-md border bg-transparent px-3 py-2 text-sm"
+            className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
           />
           <button
             type="submit"
             disabled={busy}
-            className="flex items-center gap-2 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="flex items-center gap-2 min-h-[44px] rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             <Smartphone size={14} />
             {busy ? "Creazione…" : "Genera QR"}
@@ -131,7 +131,7 @@ function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) 
       ) : (
         <QrPanel sessionId={sessionId} onConnected={() => setConnected(true)} />
       )}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }
@@ -171,23 +171,23 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
       {/* Progress */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl font-semibold">
+          <h1 className="font-display text-2xl font-bold tracking-tight">
             {STEP_TITLES[step]}
           </h1>
-          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          <span className="shrink-0 font-mono text-xs text-muted-foreground">
             Passo {step + 1} di 5
           </span>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-500/20">
+        <div className="h-2 w-full overflow-hidden rounded-full bg-muted-foreground/15">
           <div
-            className="h-full rounded-full bg-brand-600 transition-all"
+            className="h-full rounded-full bg-primary transition-all duration-500"
             style={{ width: `${((step + 1) / 5) * 100}%` }}
           />
         </div>
       </div>
 
       {/* Step content */}
-      <div className="rounded-lg border p-6" style={{ background: "var(--muted)" }}>
+      <div className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
         {step === 0 && <ConnectStep hasConnectedSession={hasConnectedSession} />}
 
         {step === 1 && (
@@ -216,13 +216,13 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                         behavior: { responseStyle: p.overrides.responseStyle },
                       })
                     }
-                    className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
-                      active ? "border-brand-600 bg-brand-600/10" : "hover:bg-brand-600/5"
+                    className={`flex items-start gap-3 rounded-2xl border border-border p-3 text-left transition-all ${
+                      active ? "border-primary bg-primary/10 shadow-sm" : "hover:border-primary/40 hover:bg-muted/50"
                     }`}
                   >
                     <span
                       className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
-                        active ? "bg-brand-600 text-white" : "bg-brand-600/10 text-brand-600"
+                        active ? "bg-primary text-primary-fg" : "bg-primary/10 text-primary"
                       }`}
                     >
                       <Icon size={16} />
@@ -249,7 +249,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                     e.target.value !== settings.persona.businessName &&
                     void save({ persona: { businessName: e.target.value } })
                   }
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
                 />
               </div>
               <div>
@@ -263,7 +263,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                     e.target.value !== settings.persona.city &&
                     void save({ persona: { city: e.target.value } })
                   }
-                  className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                  className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
                 />
               </div>
             </div>
@@ -286,7 +286,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                   e.target.value !== settings.persona.botName &&
                   void save({ persona: { botName: e.target.value } })
                 }
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
               />
             </div>
 
@@ -301,12 +301,12 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                       type="button"
                       aria-pressed={active}
                       onClick={() => void save({ persona: { tone: t.value } })}
-                      className={`rounded-lg border p-3 text-left transition-colors ${
-                        active ? "border-brand-600 bg-brand-600/10" : "hover:bg-brand-600/5"
+                      className={`rounded-2xl border border-border p-3 text-left transition-all ${
+                        active ? "border-primary bg-primary/10 shadow-sm" : "hover:border-primary/40 hover:bg-muted/50"
                       }`}
                     >
                       <p className="text-sm font-medium">{t.label}</p>
-                      <p className="mt-1 rounded-md bg-green-600/10 px-2 py-1.5 text-xs italic">
+                      <p className="mt-1 rounded-md bg-primary/10 px-2 py-1.5 text-xs italic">
                         “{t.preview}”
                       </p>
                     </button>
@@ -332,7 +332,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                   e.target.value !== settings.persona.businessDescription &&
                   void save({ persona: { businessDescription: e.target.value } })
                 }
-                className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
               />
             </div>
           </div>
@@ -341,7 +341,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
         {step === 3 && (
           <div className="space-y-5">
             <p className="flex items-start gap-2 text-sm" style={{ color: "var(--muted-foreground)" }}>
-              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-green-600" />
+              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" />
               I bot che rispondono solo a chi scrive hanno un rischio ban
               inferiore al 2%. Scegli quanto prudente vuoi essere: nessun
               numero da configurare a mano.
@@ -395,7 +395,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                   <div key={w.label} className="flex flex-1 flex-col items-center gap-1">
                     <span className="text-xs font-medium">{w.cap}</span>
                     <div
-                      className="w-full rounded-t-md bg-brand-600/70"
+                      className="w-full rounded-t-lg bg-primary/70"
                       style={{ height: `${12 + (w.cap / 1000) * 60}px` }}
                     />
                     <span className="text-[10px]" style={{ color: "var(--muted-foreground)" }}>
@@ -421,7 +421,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
             <button
               type="button"
               onClick={() => setPlaygroundOpen(true)}
-              className="mx-auto flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-brand-600/10"
+              className="mx-auto flex min-h-[44px] items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/10"
             >
               <Play size={15} />
               Apri il playground
@@ -440,7 +440,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
                 type="button"
                 onClick={() => void activate()}
                 disabled={activating}
-                className="mx-auto flex items-center gap-2 rounded-md bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+                className="mx-auto flex min-h-[48px] items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-fg shadow-sm transition-all hover:-translate-y-px hover:bg-primary-hover hover:shadow-md disabled:translate-y-0 disabled:opacity-60"
               >
                 <Rocket size={16} />
                 {activating
@@ -471,7 +471,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
             <button
               type="button"
               onClick={() => goTo(step - 1)}
-              className="flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm hover:bg-brand-600/10"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/10"
             >
               <ArrowLeft size={14} />
               Indietro
@@ -482,7 +482,7 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
               type="button"
               onClick={() => goTo(step + 1)}
               disabled={!canProceed}
-              className="flex items-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-50"
             >
               Continua
               <ArrowRight size={14} />

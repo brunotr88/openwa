@@ -17,14 +17,14 @@ export function AdviceCallout({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-brand-600/30 bg-brand-600/5 p-3">
+    <div className="rounded-2xl border border-accent/30 bg-accent/8 p-3.5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 text-left"
       >
-        <span className="flex items-center gap-2 text-sm font-medium">
-          <Lightbulb size={15} className="text-brand-600" />
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <Lightbulb size={16} className="text-accent" />
           {title}
         </span>
         <ChevronDown
@@ -33,7 +33,7 @@ export function AdviceCallout({
         />
       </button>
       {open && (
-        <div className="mt-2 space-y-1 text-xs leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+        <div className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
           {children}
         </div>
       )}

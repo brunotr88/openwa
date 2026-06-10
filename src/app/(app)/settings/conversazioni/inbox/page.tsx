@@ -20,7 +20,7 @@ export default function InboxPrefsPage() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold">Preferenze Inbox</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Preferenze Inbox</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
             Cosa entra nella tua inbox e come viene tenuta in ordine.
           </p>
@@ -90,7 +90,7 @@ export default function InboxPrefsPage() {
                   void save({ inbox: { autoCloseInactiveDays: v } });
                 }
               }}
-              className="w-24 rounded-md border bg-transparent px-3 py-2 text-sm"
+              className="w-24 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
             />
             <span className="text-sm" style={{ color: "var(--muted-foreground)" }}>
               giorni

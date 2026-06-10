@@ -26,10 +26,12 @@ export function SegmentedControl<V extends string>({
 }) {
   return (
     <div
-      className="grid gap-2"
-      style={{
-        gridTemplateColumns: `repeat(${columns ?? options.length}, minmax(0, 1fr))`,
-      }}
+      className="grid grid-cols-1 gap-2 sm:[grid-template-columns:var(--cols)]"
+      style={
+        {
+          "--cols": `repeat(${columns ?? options.length}, minmax(0, 1fr))`,
+        } as React.CSSProperties
+      }
     >
       {options.map((o) => {
         const active = o.value === value;
@@ -39,18 +41,18 @@ export function SegmentedControl<V extends string>({
             type="button"
             onClick={() => onChange(o.value)}
             aria-pressed={active}
-            className={`rounded-lg border p-3 text-left transition-colors ${
+            className={`rounded-xl border p-3 text-left transition-all ${
               active
-                ? "border-brand-600 bg-brand-600/10"
-                : "hover:bg-brand-600/5"
+                ? "border-primary bg-primary/10 shadow-sm"
+                : "border-border hover:border-primary/40 hover:bg-muted/50"
             }`}
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{o.label}</span>
+              <span className="text-sm font-semibold">{o.label}</span>
               {o.recommended && <RecommendedBadge />}
             </div>
             {o.description && (
-              <p className="mt-1 text-xs leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 {o.description}
               </p>
             )}

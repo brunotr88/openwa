@@ -15,18 +15,20 @@ export interface SessionItem {
   createdAt: string;
 }
 
-const STATUS_STYLE: Record<SessionItem["status"], string> = {
-  CONNECTED: "bg-green-500/15 text-green-600",
-  QR: "bg-amber-500/15 text-amber-600",
-  BANNED: "bg-red-500/15 text-red-600",
-  OFFLINE: "bg-gray-500/15 text-gray-500",
+const STATUS_STYLE: Record<SessionItem["status"], { cls: string; dot: string }> = {
+  CONNECTED: { cls: "bg-primary/12 text-success-fg", dot: "bg-primary" },
+  QR: { cls: "bg-accent/18 text-warn-fg", dot: "bg-accent" },
+  BANNED: { cls: "bg-danger/12 text-danger-fg", dot: "bg-danger" },
+  OFFLINE: { cls: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
 };
 
 function StatusBadge({ status }: { status: SessionItem["status"] }) {
+  const s = STATUS_STYLE[status];
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}
     >
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
       {status}
     </span>
   );
@@ -86,26 +88,30 @@ export function QrPanel({
 
   if (connected) {
     return (
-      <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-4 text-sm text-green-600">
+      <div className="rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm font-medium text-success-fg">
         Numero collegato con successo.
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg border p-4">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface p-5 shadow-sm">
       {qr ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={qr} alt="QR code WhatsApp" className="h-56 w-56 rounded bg-white p-2" />
+        <img
+          src={qr}
+          alt="QR code WhatsApp"
+          className="h-56 w-56 max-w-full rounded-xl bg-white p-2 shadow-sm"
+        />
       ) : (
-        <div className="flex h-56 w-56 items-center justify-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-          Generazione QR...
+        <div className="flex h-56 w-56 max-w-full items-center justify-center text-sm text-muted-foreground">
+          Generazione QR…
         </div>
       )}
-      <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+      <p className="text-center text-xs text-muted-foreground">
         Apri WhatsApp → Dispositivi collegati → Collega un dispositivo
       </p>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -186,14 +192,14 @@ export function SessionsClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
           {sessions.length} sessione/i
         </p>
         <button
           type="button"
           onClick={() => setAdding((v) => !v)}
-          className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+          className="min-h-[44px] rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-all hover:-translate-y-px hover:bg-primary-hover hover:shadow-md disabled:translate-y-0 disabled:opacity-60"
           disabled={busy}
         >
           {adding ? "Annulla" : "Aggiungi numero"}
@@ -201,7 +207,10 @@ export function SessionsClient({
       </div>
 
       {adding && (
-        <form onSubmit={onCreate} className="flex gap-2 rounded-lg border p-4">
+        <form
+          onSubmit={onCreate}
+          className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:flex-row"
+        >
           <input
             type="text"
             required
@@ -210,39 +219,42 @@ export function SessionsClient({
             value={label}
             onChange={(e) => setLabel(e.target.value)}
             placeholder="Etichetta numero (es. Supporto)"
-            className="flex-1 rounded-md border bg-transparent px-3 py-2 text-sm"
+            className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
           />
           <button
             type="submit"
             disabled={busy || !label.trim()}
-            className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+            className="min-h-[44px] rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-fg shadow-sm transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
-            {busy ? "Creazione..." : "Crea"}
+            {busy ? "Creazione…" : "Crea"}
           </button>
         </form>
       )}
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <ul className="space-y-3">
         {sessions.map((s) => (
-          <li key={s.id} className="rounded-lg border p-4" style={{ background: "var(--muted)" }}>
-            <div className="flex items-center justify-between gap-2">
+          <li
+            key={s.id}
+            className="rounded-2xl border border-border bg-surface p-4 shadow-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-medium">{s.phoneLabel}</p>
-                <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+                <p className="truncate font-display font-semibold">{s.phoneLabel}</p>
+                <p className="font-mono text-xs text-muted-foreground">
                   {s.lastSeenAt
                     ? `Ultimo aggiornamento: ${new Date(s.lastSeenAt).toLocaleString("it-IT")}`
                     : `Creata: ${new Date(s.createdAt).toLocaleString("it-IT")}`}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={s.status} />
                 {s.status !== "CONNECTED" && (
                   <button
                     type="button"
                     onClick={() => setPairingId(pairingId === s.id ? null : s.id)}
-                    className="rounded-md border px-2 py-1 text-xs hover:bg-brand-600/10"
+                    className="min-h-[36px] rounded-xl border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/10"
                   >
                     {pairingId === s.id ? "Chiudi QR" : "Mostra QR"}
                   </button>
@@ -251,7 +263,7 @@ export function SessionsClient({
                   type="button"
                   onClick={() => onStop(s.id)}
                   disabled={busy}
-                  className="rounded-md border px-2 py-1 text-xs hover:bg-brand-600/10 disabled:opacity-60"
+                  className="min-h-[36px] rounded-xl border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/10 disabled:opacity-60"
                 >
                   Stop
                 </button>
@@ -259,7 +271,7 @@ export function SessionsClient({
                   type="button"
                   onClick={() => onDelete(s.id)}
                   disabled={busy}
-                  className="rounded-md border border-red-500/40 px-2 py-1 text-xs text-red-500 hover:bg-red-500/10 disabled:opacity-60"
+                  className="min-h-[36px] rounded-xl border border-danger/40 px-2.5 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-60"
                 >
                   Elimina
                 </button>
@@ -280,7 +292,7 @@ export function SessionsClient({
           </li>
         ))}
         {sessions.length === 0 && (
-          <li className="rounded-lg border border-dashed p-8 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
+          <li className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             Nessuna sessione. Aggiungi un numero per iniziare.
           </li>
         )}

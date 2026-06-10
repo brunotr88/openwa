@@ -49,7 +49,7 @@ function NumberField({
         if (!Number.isNaN(n) && n >= min && n <= max && n !== value) onCommit(n);
         else setLocal(String(value));
       }}
-      className="w-28 rounded-md border bg-transparent px-3 py-2 text-sm"
+      className="w-28 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
     />
   );
 }
@@ -82,8 +82,8 @@ export default function InvioPage() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 font-display text-2xl font-semibold">
-            <ShieldCheck size={22} className="text-green-600" />
+          <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight">
+            <ShieldCheck size={22} className="text-primary" />
             Invio e protezione numero
           </h1>
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
@@ -95,12 +95,15 @@ export default function InvioPage() {
       </header>
 
       {sentToday !== null && (
-        <div className="rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--muted)" }}>
-          Oggi: <span className="font-semibold">{sentToday}/{sending.dailyCap}</span>{" "}
+        <div className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm shadow-sm">
+          Oggi:{" "}
+          <span className="font-mono font-semibold">
+            {sentToday}/{sending.dailyCap}
+          </span>{" "}
           messaggi inviati
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-500/20">
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted-foreground/15">
             <div
-              className={`h-full rounded-full ${sentToday / sending.dailyCap > 0.9 ? "bg-red-500" : "bg-green-600"}`}
+              className={`h-full rounded-full transition-all ${sentToday / sending.dailyCap > 0.9 ? "bg-danger" : "bg-primary"}`}
               style={{ width: `${Math.min(100, (sentToday / sending.dailyCap) * 100)}%` }}
             />
           </div>
@@ -153,7 +156,7 @@ export default function InvioPage() {
             ]}
           />
           {sending.sendProfile === "personalizzato" && (
-            <p className="text-xs font-medium text-amber-600">
+            <p className="text-xs font-semibold text-warn-fg">
               Profilo personalizzato attivo — valori nella sezione avanzata.
             </p>
           )}
@@ -161,7 +164,7 @@ export default function InvioPage() {
           <button
             type="button"
             onClick={() => setAdvancedOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-brand-600/5"
+            className="flex w-full min-h-[44px] items-center justify-between rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/50"
           >
             <span className="font-medium">Valori avanzati</span>
             <ChevronDown size={15} className={advancedOpen ? "rotate-180" : ""} />

@@ -38,16 +38,16 @@ export function RuleList({
 
   const chipCls =
     accent === "green"
-      ? "border-green-500/40 bg-green-500/10"
-      : "border-red-500/40 bg-red-500/10";
+      ? "border-primary/40 bg-primary/10"
+      : "border-danger/40 bg-danger/10";
 
   const visibleExamples = examples.filter((e) => !rules.includes(e));
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">{title}</p>
-        <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+        <p className="text-sm font-semibold">{title}</p>
+        <span className="font-mono text-xs text-muted-foreground">
           {rules.length}/{maxRules}
         </span>
       </div>
@@ -86,12 +86,12 @@ export function RuleList({
           maxLength={MAX_RULE_LENGTH}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={placeholder ?? "Aggiungi una regola…"}
-          className="flex-1 rounded-md border bg-transparent px-3 py-2 text-sm"
+          className="flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-base shadow-sm transition-colors focus:border-primary/50 md:text-sm"
         />
         <button
           type="submit"
           disabled={!draft.trim() || rules.length >= maxRules}
-          className="flex items-center gap-1 rounded-md border px-3 py-2 text-sm hover:bg-brand-600/10 disabled:opacity-50"
+          className="flex min-h-[44px] items-center gap-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:border-primary/40 hover:bg-muted/60 disabled:opacity-50"
         >
           <Plus size={14} />
           Aggiungi
@@ -100,7 +100,7 @@ export function RuleList({
 
       {visibleExamples.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          <p className="text-xs text-muted-foreground">
             Esempi per il tuo settore — tocca per aggiungere:
           </p>
           <div className="flex flex-wrap gap-1.5">
@@ -109,7 +109,7 @@ export function RuleList({
                 key={ex}
                 type="button"
                 onClick={() => add(ex)}
-                className="rounded-full border border-dashed px-3 py-1 text-xs hover:bg-brand-600/10"
+                className="rounded-full border border-dashed border-border px-3 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-primary/10"
               >
                 + {ex}
               </button>

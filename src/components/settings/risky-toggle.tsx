@@ -48,8 +48,8 @@ export function RiskyToggle({
 
   const palette =
     severity === "red"
-      ? "border-red-500/40 bg-red-500/10 text-red-600"
-      : "border-amber-500/40 bg-amber-500/10 text-amber-600";
+      ? "border-danger/40 bg-danger/10 text-danger-fg"
+      : "border-accent/45 bg-accent/12 text-warn-fg";
 
   return (
     <div>
@@ -58,7 +58,7 @@ export function RiskyToggle({
       </SettingRow>
 
       {isRisky && !confirming && (
-        <div className={`mb-4 flex items-start gap-2 rounded-md border p-3 text-xs ${palette}`}>
+        <div className={`mb-4 flex items-start gap-2 rounded-xl border p-3 text-xs ${palette}`}>
           {severity === "red" ? (
             <ShieldAlert size={14} className="mt-0.5 shrink-0" />
           ) : (
@@ -69,26 +69,26 @@ export function RiskyToggle({
       )}
 
       {confirming && (
-        <div className={`mb-4 space-y-3 rounded-md border p-3 text-xs ${palette}`}>
+        <div className={`mb-4 space-y-3 rounded-xl border p-3 text-xs ${palette}`}>
           <div className="flex items-start gap-2">
             <ShieldAlert size={14} className="mt-0.5 shrink-0" />
             <p className="leading-relaxed">{confirmText ?? warning}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
                 setConfirming(false);
                 onChange(riskyWhen === "on");
               }}
-              className="rounded-md bg-red-600 px-3 py-1.5 font-medium text-white"
+              className="rounded-xl bg-danger px-3 py-2 font-semibold text-white shadow-sm"
             >
               Confermo, capisco il rischio
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="rounded-md border px-3 py-1.5 font-medium"
+              className="rounded-xl border border-border bg-surface px-3 py-2 font-medium"
             >
               Annulla
             </button>

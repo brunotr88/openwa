@@ -29,7 +29,7 @@ export default function OrariPage() {
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold">Orari e disponibilità</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">Orari e disponibilità</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--muted-foreground)" }}>
             Quando è operativo il tuo team — e cosa fa l&apos;AI nel resto del tempo.
           </p>
@@ -88,7 +88,7 @@ export default function OrariPage() {
             <select
               value={hours.timezone}
               onChange={(e) => void save({ hours: { timezone: e.target.value } })}
-              className="rounded-md border bg-transparent px-3 py-2 text-sm"
+              className="rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
             >
               {TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
