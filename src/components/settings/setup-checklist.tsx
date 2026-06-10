@@ -27,10 +27,10 @@ export function SetupChecklist({
   const doneCount = items.filter((i) => i.done).length;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/8 to-accent/8 p-4 shadow-sm sm:p-5">
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="flex items-center gap-2 font-display text-sm font-semibold">
+          <p className="flex items-center gap-2 text-sm font-semibold">
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-fg">
               <Rocket size={14} />
             </span>

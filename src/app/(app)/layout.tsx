@@ -22,7 +22,7 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface/70 px-4 py-5 backdrop-blur md:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface px-4 py-5 md:flex">
         <div className="px-2">
           <Logo />
         </div>
@@ -73,7 +73,7 @@ export default async function AppLayout({
       </header>
 
       <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-8 md:pt-7">
-        <div className="ow-rise mx-auto w-full max-w-6xl">{children}</div>
+        <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
 
       <BottomTabNav />

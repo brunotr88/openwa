@@ -67,7 +67,7 @@ function contactLabel(c: ContactInfo): string {
 function Avatar({ label }: { label: string }) {
   const initial = label.trim().charAt(0).toUpperCase() || "?";
   return (
-    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/12 font-display text-sm font-semibold text-primary">
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/12 text-sm font-semibold text-primary">
       {initial}
     </span>
   );
@@ -110,7 +110,7 @@ function DraftBubble({
     <div className="ml-auto w-full max-w-md space-y-2 rounded-2xl rounded-br-md border-2 border-dashed border-accent/60 bg-accent/10 p-3.5 shadow-sm">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-warn-fg">
         <MessageSquareDashed size={14} />
-        Bozza AI — da approvare
+        Bozza AI da approvare
       </p>
       <textarea
         value={text}
@@ -225,9 +225,20 @@ function Thread({
 
   if (!thread) {
     return (
-      <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-        <RefreshCw size={15} className="animate-spin" />
-        Caricamento…
+      <div className="flex min-h-0 flex-1 flex-col" aria-busy="true">
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <span className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="space-y-1.5">
+            <span className="block h-3.5 w-32 animate-pulse rounded bg-muted" />
+            <span className="block h-3 w-24 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+        <div className="flex-1 space-y-3 px-4 py-4">
+          <span className="block h-10 w-56 max-w-[70%] animate-pulse rounded-2xl rounded-bl-md bg-muted" />
+          <span className="ml-auto block h-12 w-64 max-w-[75%] animate-pulse rounded-2xl rounded-br-md bg-muted" />
+          <span className="block h-8 w-44 max-w-[60%] animate-pulse rounded-2xl rounded-bl-md bg-muted" />
+        </div>
+        <span className="sr-only">Caricamento conversazione…</span>
       </div>
     );
   }
@@ -265,7 +276,8 @@ function Thread({
               key={m}
               type="button"
               onClick={() => setMode(m)}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              aria-pressed={thread.mode === m}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors active:scale-95 ${
                 thread.mode === m
                   ? MODE_STYLE[m]
                   : "text-muted-foreground opacity-60 hover:bg-muted hover:opacity-100"
@@ -329,7 +341,7 @@ function Thread({
           type="submit"
           disabled={busy || !reply.trim()}
           aria-label="Invia"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg shadow-sm transition-all hover:bg-primary-hover disabled:opacity-50"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary text-primary-fg shadow-sm transition-all hover:bg-primary-hover active:scale-95 disabled:opacity-50 disabled:active:scale-100"
         >
           <Send size={17} />
         </button>
@@ -427,6 +439,20 @@ export function InboxClient() {
             selectedId ? "hidden md:block" : "block"
           }`}
         >
+          {!loaded &&
+            Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`skeleton-${i}`}
+                className="flex items-center gap-3 border-b border-border px-3.5 py-3"
+                aria-hidden="true"
+              >
+                <span className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-muted" />
+                <span className="min-w-0 flex-1 space-y-1.5">
+                  <span className="block h-3.5 w-2/5 animate-pulse rounded bg-muted" />
+                  <span className="block h-3 w-3/4 animate-pulse rounded bg-muted" />
+                </span>
+              </div>
+            ))}
           {conversations.map((c) => {
             const active = selectedId === c.id;
             return (
@@ -434,7 +460,7 @@ export function InboxClient() {
                 key={c.id}
                 type="button"
                 onClick={() => setSelectedId(c.id)}
-                className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-muted/50 ${
+                className={`flex w-full items-center gap-3 border-b border-border px-3.5 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 active:bg-primary/8 ${
                   active ? "bg-primary/8" : ""
                 }`}
               >
@@ -454,16 +480,26 @@ export function InboxClient() {
                     {c.lastMessage?.status === "DRAFT" && (
                       <span className="font-semibold text-warn-fg">✎ Bozza: </span>
                     )}
-                    {c.lastMessage?.body ?? "—"}
+                    {c.lastMessage?.body ?? "Nessun messaggio"}
                   </span>
                 </span>
               </button>
             );
           })}
           {loaded && conversations.length === 0 && (
-            <p className="p-8 text-center text-sm text-muted-foreground">
-              Nessuna conversazione.
-            </p>
+            <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+                <MessageSquareDashed size={22} />
+              </span>
+              <p className="text-sm font-semibold text-ink">
+                Ancora nessuna conversazione
+              </p>
+              <p className="max-w-[18rem] text-xs leading-relaxed text-muted-foreground">
+                Quando un cliente scrive al tuo numero WhatsApp, la chat compare
+                qui. Collega un numero in Sessioni per iniziare a ricevere
+                messaggi.
+              </p>
+            </div>
           )}
         </aside>
 

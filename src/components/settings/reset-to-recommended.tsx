@@ -75,7 +75,7 @@ export function ResetToRecommended({
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-sm">
           <div
-            className="ow-rise w-full max-w-md space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-lg"
+            className="ow-fade w-full max-w-md space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-lg"
             role="dialog"
             aria-modal="true"
           >

@@ -108,8 +108,7 @@ export function BotPlayground({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-ink/30 backdrop-blur-sm">
       <div
-        className="ow-fade flex h-full w-full max-w-md flex-col border-l border-border shadow-lg"
-        style={{ background: "var(--bg)" }}
+        className="ow-fade flex h-full w-full max-w-md flex-col border-l border-border bg-bg shadow-lg"
         role="dialog"
         aria-modal="true"
         aria-label="Prova il bot"
@@ -123,7 +122,7 @@ export function BotPlayground({
             <div>
               <p className="font-display text-sm font-semibold">{botName}</p>
               <p className="text-xs text-muted-foreground">
-                {busy ? "sta scrivendo…" : "Anteprima — nessun messaggio reale"}
+                {busy ? "sta scrivendo…" : "Anteprima, nessun messaggio reale"}
               </p>
             </div>
           </div>

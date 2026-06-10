@@ -88,13 +88,13 @@ export function BottomTabNav() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors ${
-                active ? "text-primary" : "text-muted-foreground"
+              className={`group flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors active:scale-95 ${
+                active ? "text-primary" : "text-muted-foreground hover:text-ink"
               }`}
             >
               <span
                 className={`flex h-7 items-center justify-center rounded-full px-3 transition-colors ${
-                  active ? "bg-primary/12" : ""
+                  active ? "bg-primary/12" : "group-hover:bg-muted/60"
                 }`}
               >
                 <Icon size={20} />

@@ -104,7 +104,10 @@ export function QrPanel({
           className="h-56 w-56 max-w-full rounded-xl bg-white p-2 shadow-sm"
         />
       ) : (
-        <div className="flex h-56 w-56 max-w-full items-center justify-center text-sm text-muted-foreground">
+        <div
+          className="flex h-56 w-56 max-w-full animate-pulse items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground"
+          aria-busy="true"
+        >
           Generazione QR…
         </div>
       )}
@@ -241,7 +244,7 @@ export function SessionsClient({
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-display font-semibold">{s.phoneLabel}</p>
+                <p className="truncate font-semibold">{s.phoneLabel}</p>
                 <p className="font-mono text-xs text-muted-foreground">
                   {s.lastSeenAt
                     ? `Ultimo aggiornamento: ${new Date(s.lastSeenAt).toLocaleString("it-IT")}`
@@ -292,8 +295,14 @@ export function SessionsClient({
           </li>
         ))}
         {sessions.length === 0 && (
-          <li className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            Nessuna sessione. Aggiungi un numero per iniziare.
+          <li className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border p-10 text-center">
+            <p className="text-sm font-semibold text-ink">
+              Nessun numero collegato
+            </p>
+            <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+              Aggiungi un numero e scansiona il QR da WhatsApp per ricevere e
+              rispondere ai messaggi dei clienti da qui.
+            </p>
           </li>
         )}
       </ul>

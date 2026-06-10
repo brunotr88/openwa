@@ -39,7 +39,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-5">
-      <div className="ow-rise w-full max-w-sm">
+      <div className="w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           <Logo size={44} withWordmark={false} />
           <div>
