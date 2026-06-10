@@ -52,6 +52,21 @@ export type SendProfile = z.infer<typeof sendProfileSchema>;
 export const groupFilterSchema = z.enum(["mostra_no_ai", "ignora"]);
 export type GroupFilter = z.infer<typeof groupFilterSchema>;
 
+export const appointmentsProviderSchema = z.enum([
+  "nessuno",
+  "calendly_link",
+  "google_calendar",
+]);
+export type AppointmentsProvider = z.infer<typeof appointmentsProviderSchema>;
+
+/**
+ * proponi (consigliato): l'AI propone gli slot e prenota SOLO dopo conferma
+ * esplicita del cliente in chat. prenota_diretto: prenota appena il cliente
+ * sceglie uno slot.
+ */
+export const bookingModeSchema = z.enum(["proponi", "prenota_diretto"]);
+export type BookingMode = z.infer<typeof bookingModeSchema>;
+
 // ─── Sections ────────────────────────────────────────────────────────────────
 
 export const personaSchema = z.object({
@@ -149,6 +164,32 @@ export const inboxSchema = z.object({
   autoCloseInactiveDays: z.number().int().min(0).max(365).default(0),
 });
 
+/** Prenotazione appuntamenti (M5): Calendly link o Google Calendar reale. */
+export const appointmentsSchema = z.object({
+  provider: appointmentsProviderSchema.default("nessuno"),
+  /** Link Calendly condiviso dall'AI quando il cliente vuole prenotare. */
+  calendlyUrl: z
+    .string()
+    .max(300)
+    .refine((v) => v === "" || /^https:\/\/\S+$/.test(v), {
+      message: "Deve essere un URL https valido",
+    })
+    .default(""),
+  /** ID del calendario Google condiviso con l'account di servizio. */
+  googleCalendarId: z.string().max(200).default(""),
+  /** Durata di un appuntamento (minuti). */
+  slotDurationMin: z.number().int().min(5).max(480).default(30),
+  /** Pausa tra un appuntamento e il successivo (minuti). */
+  bufferMin: z.number().int().min(0).max(120).default(15),
+  /** Preavviso minimo prima del primo slot prenotabile (ore). */
+  minNoticeHours: z.number().int().min(0).max(168).default(12),
+  /** Orizzonte massimo di prenotazione (giorni). */
+  maxDaysAhead: z.number().int().min(1).max(90).default(14),
+  bookingMode: bookingModeSchema.default("proponi"),
+  /** Dopo la prenotazione l'AI invia un messaggio di riepilogo/conferma. */
+  confirmationMessage: z.boolean().default(true),
+});
+
 /** Avanzamento wizard /setup (persistito per riprendere il wizard). */
 export const setupSchema = z.object({
   step: z.number().int().min(0).max(5).default(0),
@@ -163,6 +204,7 @@ export const tenantSettingsSchema = z.object({
   hours: hoursSchema.default({}),
   sending: sendingSchema.default({}),
   inbox: inboxSchema.default({}),
+  appointments: appointmentsSchema.default({}),
   setup: setupSchema.default({}),
 });
 
@@ -172,3 +214,4 @@ export type BehaviorSettings = z.infer<typeof behaviorSchema>;
 export type HoursSettings = z.infer<typeof hoursSchema>;
 export type SendingSettings = z.infer<typeof sendingSchema>;
 export type InboxSettings = z.infer<typeof inboxSchema>;
+export type AppointmentsSettings = z.infer<typeof appointmentsSchema>;
