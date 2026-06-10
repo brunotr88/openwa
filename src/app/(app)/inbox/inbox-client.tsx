@@ -8,6 +8,7 @@
  * - manual reply box
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { contactDisplayName, contactPhoneLine } from "@/lib/wa/contact-resolve";
 
 type Mode = "AUTO" | "COPILOT" | "MANUAL";
 
@@ -15,6 +16,7 @@ interface ContactInfo {
   id: string;
   waId: string;
   name: string | null;
+  phone: string | null;
 }
 
 interface ConversationListItem {
@@ -56,7 +58,7 @@ const MODE_STYLE: Record<Mode, string> = {
 };
 
 function contactLabel(c: ContactInfo): string {
-  return c.name || `+${c.waId}`;
+  return contactDisplayName(c);
 }
 
 function DraftBubble({
@@ -216,9 +218,11 @@ function Thread({
       <div className="flex items-center justify-between border-b pb-3">
         <div>
           <p className="font-medium">{contactLabel(thread.contact)}</p>
-          <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-            +{thread.contact.waId}
-          </p>
+          {contactPhoneLine(thread.contact) && (
+            <p className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+              {contactPhoneLine(thread.contact)}
+            </p>
+          )}
         </div>
         <div className="flex gap-1">
           {MODES.map((m) => (
@@ -298,6 +302,51 @@ function Thread({
   );
 }
 
+function ResolveContactsButton({ onDone }: { onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/contacts/resolve", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        updated?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        setMsg(data.error ?? "Aggiornamento fallito.");
+        return;
+      }
+      setMsg(`${data.updated ?? 0} contatti aggiornati.`);
+      onDone();
+    } catch {
+      setMsg("Errore di rete.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={run}
+        disabled={busy}
+        className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-brand-600/5 disabled:opacity-60"
+      >
+        {busy ? "Aggiornamento..." : "Aggiorna nomi/numeri"}
+      </button>
+      {msg && (
+        <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
+          {msg}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function InboxClient() {
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -332,7 +381,11 @@ export function InboxClient() {
   }, [refresh]);
 
   return (
-    <div className="flex min-h-0 flex-1 gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex justify-end">
+        <ResolveContactsButton onDone={() => void refresh()} />
+      </div>
+      <div className="flex min-h-0 flex-1 gap-4">
       <aside className="w-72 shrink-0 overflow-y-auto rounded-lg border">
         {conversations.map((c) => (
           <button
@@ -377,6 +430,7 @@ export function InboxClient() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

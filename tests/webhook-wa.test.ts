@@ -6,7 +6,7 @@ import { createHmac } from "crypto";
 const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
   mockDb: {
     waSession: { findFirst: vi.fn(), update: vi.fn() },
-    contact: { upsert: vi.fn() },
+    contact: { upsert: vi.fn(), update: vi.fn() },
     tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     message: { create: vi.fn() },
@@ -75,7 +75,14 @@ beforeEach(() => {
     status: "CONNECTED",
   });
   mockDb.waSession.update.mockResolvedValue({});
-  mockDb.contact.upsert.mockResolvedValue({ id: "c1", tenantId: "t1", waId: "393331234567" });
+  mockDb.contact.upsert.mockResolvedValue({
+    id: "c1",
+    tenantId: "t1",
+    waId: "393331234567",
+    name: null,
+    phone: null,
+  });
+  mockDb.contact.update.mockResolvedValue({});
   // TenantSettings: bot attivo in AUTO
   mockDb.tenant.findUnique.mockResolvedValue({
     settings: { behavior: { aiMode: "AUTO" } },
