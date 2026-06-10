@@ -157,8 +157,9 @@ model WaSession {
 model Contact {
   id             String      @id @default(cuid())
   tenantId       String
-  waId           String      // WhatsApp ID (phone@c.us)
-  name           String?
+  waId           String      // WhatsApp ID (suffix-stripped; @lid or phone) — stable matching key
+  name           String?     // resolved display name (pushName)
+  phone          String?     // resolved real phone number (e.g. "393478435299"), no suffix
   profileSummary String?     // LLM-generated summary of contact preferences
   optInStatus    OptInStatus @default(UNKNOWN)
   tags           String[]    @default([])
