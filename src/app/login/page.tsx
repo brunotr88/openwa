@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/ui/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,70 +34,94 @@ export default function LoginPage() {
     router.push("/inbox");
   }
 
+  const field =
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-3 text-base shadow-sm transition-colors focus:border-primary/50 md:text-sm";
+
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm space-y-4 rounded-xl border p-6"
-        style={{ background: "var(--muted)" }}
-      >
-        <h1 className="text-xl font-semibold">OpenWA — Accedi</h1>
-
-        <div className="space-y-1">
-          <label htmlFor="email" className="text-sm">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@example.com"
-            className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-          />
+    <main className="flex min-h-screen items-center justify-center p-5">
+      <div className="ow-rise w-full max-w-sm">
+        <div className="mb-7 flex flex-col items-center gap-3 text-center">
+          <Logo size={44} withWordmark={false} />
+          <div>
+            <h1 className="font-display text-2xl font-bold tracking-tight">
+              Bentornato
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Accedi alla tua console WhatsApp + AI.
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="text-sm">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label htmlFor="totp" className="text-sm">
-            Codice 2FA (opzionale)
-          </label>
-          <input
-            id="totp"
-            type="text"
-            inputMode="numeric"
-            value={totp}
-            onChange={(e) => setTotp(e.target.value)}
-            className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        <form
+          onSubmit={onSubmit}
+          className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-lg"
         >
-          {loading ? "Accesso..." : "Accedi"}
-        </button>
-      </form>
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-sm font-medium">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@example.com"
+              className={field}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="password" className="text-sm font-medium">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={field}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="totp" className="text-sm font-medium">
+              Codice 2FA{" "}
+              <span className="font-normal text-muted-foreground">(opzionale)</span>
+            </label>
+            <input
+              id="totp"
+              type="text"
+              inputMode="numeric"
+              value={totp}
+              onChange={(e) => setTotp(e.target.value)}
+              placeholder="123456"
+              className={`${field} font-mono tracking-[0.3em]`}
+            />
+          </div>
+
+          {error && (
+            <p className="rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="min-h-[48px] w-full rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-primary-fg shadow-sm transition-all hover:-translate-y-px hover:bg-primary-hover hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:opacity-60"
+          >
+            {loading ? "Accesso…" : "Accedi"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+          OpenWA · Console Operativa
+        </p>
+      </div>
     </main>
   );
 }

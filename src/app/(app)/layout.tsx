@@ -1,11 +1,15 @@
 /**
- * App shell — sidebar nav (Inbox, Sessioni) + sign out.
- * Server component: interactivity limited to links and a signOut form action.
+ * App shell — responsive:
+ *  - Desktop (md+): fixed left sidebar (logo + nav + signOut at bottom).
+ *  - Mobile: top bar (logo + page title) + fixed bottom tab nav.
+ * Server component: interactivity limited to links and the signOut form action;
+ * active-state nav is delegated to client components in app-nav.tsx.
  */
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Inbox, Smartphone, Settings, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { auth, signOut } from "@/lib/auth";
+import { Logo } from "@/components/ui/logo";
+import { SidebarNav, MobileTitle, BottomTabNav } from "./app-nav";
 
 export default async function AppLayout({
   children,
@@ -17,40 +21,18 @@ export default async function AppLayout({
 
   return (
     <div className="flex min-h-screen">
-      <aside
-        className="flex w-56 shrink-0 flex-col border-r p-4"
-        style={{ background: "var(--muted)" }}
-      >
-        <div className="mb-6 px-2 font-display text-lg font-semibold">
-          OpenWA
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-surface/70 px-4 py-5 backdrop-blur md:flex">
+        <div className="px-2">
+          <Logo />
         </div>
 
-        <nav className="flex flex-col gap-1 text-sm">
-          <Link
-            href="/inbox"
-            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-brand-600/10"
-          >
-            <Inbox size={16} />
-            Inbox
-          </Link>
-          <Link
-            href="/sessions"
-            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-brand-600/10"
-          >
-            <Smartphone size={16} />
-            Sessioni
-          </Link>
-          <Link
-            href="/settings"
-            className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-brand-600/10"
-          >
-            <Settings size={16} />
-            Impostazioni
-          </Link>
-        </nav>
+        <div className="mt-8 flex-1">
+          <SidebarNav />
+        </div>
 
-        <div className="mt-auto space-y-2">
-          <p className="truncate px-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+        <div className="space-y-2 border-t border-border pt-4">
+          <p className="truncate px-3 font-mono text-xs text-muted-foreground">
             {session.user.email}
           </p>
           <form
@@ -61,16 +43,40 @@ export default async function AppLayout({
           >
             <button
               type="submit"
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-brand-600/10"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
             >
-              <LogOut size={16} />
+              <LogOut size={18} />
               Esci
             </button>
           </form>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-6">{children}</main>
+      {/* Mobile top bar */}
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur md:hidden">
+        <Logo size={26} withWordmark={false} />
+        <MobileTitle />
+        <form
+          action={async () => {
+            "use server";
+            await signOut({ redirectTo: "/login" });
+          }}
+        >
+          <button
+            type="submit"
+            aria-label="Esci"
+            className="grid h-10 w-10 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger"
+          >
+            <LogOut size={18} />
+          </button>
+        </form>
+      </header>
+
+      <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-8 md:pt-7">
+        <div className="ow-rise mx-auto w-full max-w-6xl">{children}</div>
+      </main>
+
+      <BottomTabNav />
     </div>
   );
 }
