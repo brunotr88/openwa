@@ -24,9 +24,11 @@ const MAX_PER_SESSION_PER_TICK = 1;
 /** Un job in SENDING più vecchio di così = processo morto tra lock e record:
  *  lo marchiamo FAILED (fail-closed, MAI re-inviato → consegna at-most-once). */
 const STALE_SENDING_MS = 5 * 60_000;
-/** Oltre questa età un job che continua a essere rinviato viene terminato
- *  (evita retry infiniti su sessione offline / fuori orario / cap). */
-const MAX_JOB_AGE_MS = 24 * 3_600_000;
+/** Oltre questa età un job ancora non inviato viene terminato (evita retry
+ *  infiniti su sessione offline). 7 giorni: deve coprire weekend/festivi,
+ *  quando businessHoursOnlyOutbound rimanda al prossimo orario lavorativo —
+ *  un valore più basso (es. 24h) scarterebbe i messaggi accodati di sabato. */
+const MAX_JOB_AGE_MS = 7 * 24 * 3_600_000;
 
 export interface DrainSummary {
   processed: number;
