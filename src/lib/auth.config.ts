@@ -25,7 +25,11 @@ export const authConfig: NextAuthConfig = {
       const isPublicApi =
         nextUrl.pathname.startsWith("/api/health") ||
         // Gateway webhook receiver — authenticated via HMAC signature, not session.
-        nextUrl.pathname.startsWith("/api/webhooks/wa");
+        nextUrl.pathname.startsWith("/api/webhooks/wa") ||
+        // Private outbound API — authenticated per-route via X-Api-Key.
+        nextUrl.pathname.startsWith("/api/v1/") ||
+        // Internal worker tick — authenticated via Bearer INTERNAL_GATEWAY_SECRET.
+        nextUrl.pathname.startsWith("/api/internal/");
 
       if (isAuthRoute || isPublicApi) return true;
       if (isLoggedIn) return true;
