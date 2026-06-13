@@ -82,6 +82,28 @@ enum AiProviderType {
   OPENAI
 }
 
+enum OutboundMode {
+  TEXT
+  TEMPLATE
+  INTENT
+}
+
+enum OutboundStatus {
+  PENDING
+  SENDING
+  DONE
+  FAILED
+  CANCELED
+}
+
+enum CampaignStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  DONE
+  CANCELED
+}
+
 // ─── Core Tenant ─────────────────────────────────────────────────────────────
 
 model Tenant {
@@ -100,6 +122,10 @@ model Tenant {
   messages      Message[]
   aiConfigs     AiConfig[]
   auditLogs     AuditLog[]
+  apiKeys      ApiKey[]
+  templates    Template[]
+  campaigns    Campaign[]
+  outboundJobs OutboundJob[]
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -147,6 +173,8 @@ model WaSession {
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   conversations Conversation[]
+  campaigns    Campaign[]
+  outboundJobs OutboundJob[]
 
   @@index([tenantId])
   @@index([status])
@@ -168,6 +196,7 @@ model Contact {
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   conversations Conversation[]
+  outboundJobs OutboundJob[]
 
   @@unique([tenantId, waId])
   @@index([tenantId])
@@ -191,6 +220,7 @@ model Conversation {
   session  WaSession @relation(fields: [sessionId], references: [id])
   assignee User?     @relation(fields: [assignedUserId], references: [id])
   messages Message[]
+  outboundJobs OutboundJob[]
 
   @@index([tenantId])
   @@index([status])
@@ -258,4 +288,95 @@ model AuditLog {
   @@index([userId])
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ─── Outbound queue (Fase 3) ────────────────────────────────────────────────
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  hashedKey  String    @unique          // sha256(plaintext) hex
+  prefix     String                      // primi 12 char del plaintext, per display
+  label      String
+  scopes     String[]  @default([])      // es. ["messages:send"]
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model Template {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  body      String                       // testo con {{placeholder}}
+  variables String[]  @default([])        // nomi placeholder estratti
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  campaigns Campaign[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  tenantId        String
+  sessionId       String
+  name            String
+  mode            OutboundMode   @default(TEXT)
+  body            String?                       // se TEXT
+  templateId      String?                       // se TEMPLATE
+  defaultVars     Json?                         // vars di campagna per il template
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  totalRecipients Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id])
+  session  WaSession     @relation(fields: [sessionId], references: [id])
+  template Template?     @relation(fields: [templateId], references: [id])
+  jobs     OutboundJob[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model OutboundJob {
+  id             String         @id @default(cuid())
+  tenantId       String
+  sessionId      String
+  contactId      String
+  conversationId String?
+  campaignId     String?
+  mode           OutboundMode
+  payload        Json                          // OutboundPayload (lib/outbound/types.ts)
+  source         MessageSource  @default(API)
+  status         OutboundStatus @default(PENDING)
+  scheduledAt    DateTime?                      // null = appena possibile
+  attempts       Int            @default(0)
+  maxAttempts    Int            @default(3)
+  lastError      String?
+  messageId      String?                        // Message creato all'invio
+  createdAt      DateTime       @default(now())
+  sentAt         DateTime?
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  session      WaSession     @relation(fields: [sessionId], references: [id])
+  contact      Contact       @relation(fields: [contactId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([tenantId])
+  @@index([sessionId, status])
+  @@index([campaignId])
 }
