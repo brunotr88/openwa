@@ -17,10 +17,16 @@ import {
   lengthMaxTokens,
 } from "@/lib/settings";
 import { renderTemplate } from "./template";
-import { evaluateSendEligibility, isJobDue, backoffDelayMs } from "./pacing";
+import { evaluateSendEligibility, isJobExpired, backoffDelayMs } from "./pacing";
 import type { OutboundPayload } from "./types";
 
 const MAX_PER_SESSION_PER_TICK = 1;
+/** Un job in SENDING più vecchio di così = processo morto tra lock e record:
+ *  lo marchiamo FAILED (fail-closed, MAI re-inviato → consegna at-most-once). */
+const STALE_SENDING_MS = 5 * 60_000;
+/** Oltre questa età un job che continua a essere rinviato viene terminato
+ *  (evita retry infiniti su sessione offline / fuori orario / cap). */
+const MAX_JOB_AGE_MS = 24 * 3_600_000;
 
 export interface DrainSummary {
   processed: number;
@@ -32,6 +38,14 @@ export interface DrainSummary {
 export async function drainOutbound(now: Date = new Date()): Promise<DrainSummary> {
   const summary: DrainSummary = { processed: 0, sent: 0, failed: 0, skipped: 0 };
 
+  // Recupero job orfani: un SENDING bloccato da troppo (processo morto tra il
+  // lock e la scrittura del Message) NON viene re-inviato — rischio duplicato —
+  // ma marcato FAILED; l'app/campagna lo vede e può ripianificarlo.
+  await db.outboundJob.updateMany({
+    where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
+    data: { status: "FAILED", lastError: "stuck_in_sending" },
+  });
+
   const dueJobs = await db.outboundJob.findMany({
     where: {
       status: "PENDING",
@@ -42,7 +56,6 @@ export async function drainOutbound(now: Date = new Date()): Promise<DrainSummar
   });
   const bySession = new Map<string, string[]>();
   for (const j of dueJobs) {
-    if (!isJobDue(null, now)) continue;
     const arr = bySession.get(j.sessionId) ?? [];
     if (arr.length < MAX_PER_SESSION_PER_TICK) arr.push(j.id);
     bySession.set(j.sessionId, arr);
@@ -73,12 +86,29 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
   });
   if (!job) return "skipped";
 
+  if (isJobExpired(job.createdAt, now, MAX_JOB_AGE_MS)) {
+    await db.outboundJob.update({
+      where: { id: job.id },
+      data: { status: "FAILED", lastError: "expired" },
+    });
+    await auditLog({
+      tenantId: job.tenantId,
+      action: "outbound.expired",
+      entity: "OutboundJob",
+      entityId: job.id,
+      meta: { contactId: job.contactId, ageMs: now.getTime() - job.createdAt.getTime() },
+    });
+    return "failed";
+  }
+
   const settings = await getTenantSettings(job.tenantId);
 
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const startOfHour = new Date(now);
   startOfHour.setMinutes(0, 0, 0);
+  // NB: cap e spacing sono aggregati PER-TENANT (non per-sessione) — più
+  // conservativi (mai sovra-invio) e condivisi con le risposte AI in entrata.
   const [sentToday, sentThisHour, lastOut] = await Promise.all([
     db.message.count({
       where: {
@@ -162,6 +192,7 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
   if (!body.trim()) {
     return await markFailed(job.id, job.tenantId, job.attempts, job.maxAttempts, now, new Error("empty body"));
   }
+  const finalBody = body.slice(0, 4096);
 
   const conversationId =
     job.conversationId ??
@@ -170,14 +201,14 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
   try {
     const gwId = job.session.sessionDataRef;
     if (!gwId) throw new Error("session has no gateway ref");
-    await sendText(gwId, job.contact.phone ?? job.contact.waId, body);
+    await sendText(gwId, job.contact.phone ?? job.contact.waId, finalBody);
 
     const message = await db.message.create({
       data: {
         conversationId,
         tenantId: job.tenantId,
         direction: "OUT",
-        body,
+        body: finalBody,
         status: "SENT",
         aiGenerated: job.mode === "INTENT",
         source: job.source,

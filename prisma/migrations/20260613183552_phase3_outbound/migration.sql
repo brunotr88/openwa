@@ -74,6 +74,7 @@ CREATE TABLE "OutboundJob" (
     "lastError" TEXT,
     "messageId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
     "sentAt" TIMESTAMP(3),
 
     CONSTRAINT "OutboundJob_pkey" PRIMARY KEY ("id")

@@ -367,6 +367,7 @@ model OutboundJob {
   lastError      String?
   messageId      String?                        // Message creato all'invio
   createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   sentAt         DateTime?
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])

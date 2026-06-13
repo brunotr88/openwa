@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isJobDue, backoffDelayMs, evaluateSendEligibility } from "@/lib/outbound/pacing";
+import { isJobDue, backoffDelayMs, evaluateSendEligibility, isJobExpired } from "@/lib/outbound/pacing";
 import type { SendGate } from "@/lib/outbound/types";
 
 const base = (over: Partial<SendGate> = {}): SendGate => ({
@@ -49,6 +49,12 @@ describe("evaluateSendEligibility", () => {
     expect(d.ok).toBe(false);
     expect(d.reason).toBe("session_banned");
   });
+  it("blocca BANNED come stop definitivo anche con pauseOnRisk off", () => {
+    const d = evaluateSendEligibility(base({ sessionStatus: "BANNED", pauseOnRisk: false }));
+    expect(d.ok).toBe(false);
+    expect(d.reason).toBe("session_banned");
+    expect(d.retryAfterMs).toBeUndefined();
+  });
   it("blocca se non opted-in", () => {
     expect(evaluateSendEligibility(base({ optedIn: false }))).toMatchObject({
       ok: false,
@@ -84,5 +90,15 @@ describe("evaluateSendEligibility", () => {
     expect(
       evaluateSendEligibility(base({ withinHours: false, businessHoursOnlyOutbound: false })).ok
     ).toBe(true);
+  });
+});
+
+describe("isJobExpired", () => {
+  const now = new Date("2026-06-13T10:00:00Z");
+  it("true se più vecchio di maxAge", () => {
+    expect(isJobExpired(new Date("2026-06-12T09:00:00Z"), now, 24 * 3_600_000)).toBe(true);
+  });
+  it("false se entro maxAge", () => {
+    expect(isJobExpired(new Date("2026-06-13T09:00:00Z"), now, 24 * 3_600_000)).toBe(false);
   });
 });

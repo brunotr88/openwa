@@ -16,8 +16,15 @@ export function backoffDelayMs(attempts: number): number {
   return Math.min(ms, 3_600_000);
 }
 
+/** True se il job è più vecchio di maxAgeMs (per terminare i retry infiniti). */
+export function isJobExpired(createdAt: Date, now: Date, maxAgeMs: number): boolean {
+  return now.getTime() - createdAt.getTime() > maxAgeMs;
+}
+
 export function evaluateSendEligibility(g: SendGate): SendDecision {
-  if (g.pauseOnRisk && g.sessionStatus === "BANNED") {
+  if (g.sessionStatus === "BANNED") {
+    // Ban confermato: stop definitivo, mai ritentare (anti-ban). pauseOnRisk
+    // governa eventuali pause su rischio-scoring, non l'onorare un ban certo.
     return { ok: false, reason: "session_banned" };
   }
   if (g.sessionStatus !== "CONNECTED") {
