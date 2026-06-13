@@ -14,6 +14,7 @@ import {
   CalendarCheck,
   CalendarClock,
   Inbox,
+  KeyRound,
   Play,
   Settings2,
   ShieldCheck,
@@ -61,6 +62,7 @@ const NAV: Array<{ group: string; items: NavItem[] }> = [
     group: "Workspace",
     items: [
       { label: "Generale", href: "/settings/workspace/generale", icon: <Settings2 size={15} /> },
+      { label: "Sviluppatori", href: "/settings/sviluppatori", icon: <KeyRound size={15} /> },
       { label: "Team", icon: <Users size={15} />, soon: true },
       { label: "API & Webhook", icon: <Webhook size={15} />, soon: true },
     ],
