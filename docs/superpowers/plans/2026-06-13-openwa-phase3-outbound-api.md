@@ -201,20 +201,30 @@ In `model Conversation { ... }` (dopo `messages Message[]`):
   outboundJobs OutboundJob[]
 ```
 
-- [ ] **Step 4: Generare la migrazione e il client**
+- [ ] **Step 4: Generare la migrazione e il client SENZA DB locale**
 
-Run:
+Qui non c'è un Postgres locale né `.env` con `DATABASE_URL`, e il DB di produzione non è raggiungibile da questa macchina. Quindi NON usare `prisma migrate dev` (richiede una connessione/shadow DB). Si genera l'SQL diffando il **datamodel committato** (prima delle modifiche) contro quello **nuovo** — `--from-schema-datamodel`/`--to-schema-datamodel` NON richiedono shadow DB.
+
+Run (dopo aver salvato le modifiche a `prisma/schema.prisma`):
 ```bash
 cd /mnt/c/PROGETTI/SOFTWARES/OpenWA
-PRISMA_HIDE_UPDATE_MESSAGE=1 npx prisma migrate dev --name phase3_outbound --create-only
+git show HEAD:prisma/schema.prisma > /tmp/prev-schema.prisma
+MIG="prisma/migrations/$(date -u +%Y%m%d%H%M%S)_phase3_outbound"
+mkdir -p "$MIG"
+PRISMA_HIDE_UPDATE_MESSAGE=1 npx prisma migrate diff \
+  --from-schema-datamodel /tmp/prev-schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma \
+  --script > "$MIG/migration.sql"
+echo "Migrazione: $MIG/migration.sql"
+cat "$MIG/migration.sql"
 ```
-Aprire il file SQL generato in `prisma/migrations/*_phase3_outbound/migration.sql` e **verificare** che non contenga righe non-SQL (box "Update available"); se presenti, rimuoverle. Poi:
+**Verificare** che `migration.sql`: (a) contenga solo SQL (nessun box "Update available"); (b) crei i tipi enum `OutboundMode`/`OutboundStatus`/`CampaignStatus` e le tabelle `ApiKey`/`Template`/`Campaign`/`OutboundJob` con i loro indici. Poi rigenerare il client (non serve DB):
 ```bash
 PRISMA_HIDE_UPDATE_MESSAGE=1 npx prisma generate
 ```
-Expected: client rigenerato senza errori; nuovi tipi `OutboundJob`, `ApiKey`, `Template`, `Campaign` disponibili.
+Expected: client rigenerato senza errori; nuovi tipi `OutboundJob`, `ApiKey`, `Template`, `Campaign` disponibili. La migrazione verrà applicata in produzione da `prisma migrate deploy` allo start del container Coolify.
 
-> Se è attivo un Postgres locale: `PRISMA_HIDE_UPDATE_MESSAGE=1 npx prisma migrate dev --name phase3_outbound` (senza `--create-only`) applica subito. In assenza di DB locale usare `--create-only` (sopra) e lasciare l'apply al deploy.
+> Il timestamp generato da `date -u` è lessicograficamente successivo all'ultima migrazione (`20260610164220_contact_phone`), quindi l'ordine è corretto.
 
 - [ ] **Step 5: Commit**
 
