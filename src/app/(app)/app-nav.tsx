@@ -7,7 +7,7 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Inbox, Smartphone, Settings, type LucideIcon } from "lucide-react";
+import { Inbox, Smartphone, Megaphone, Settings, type LucideIcon } from "lucide-react";
 
 interface NavLink {
   href: string;
@@ -29,6 +29,12 @@ const NAV: NavLink[] = [
     label: "Sessioni",
     icon: Smartphone,
     match: (p) => p.startsWith("/sessions"),
+  },
+  {
+    href: "/campagne",
+    label: "Campagne",
+    icon: Megaphone,
+    match: (p) => p.startsWith("/campagne"),
   },
   {
     href: "/settings/agente/profilo",
