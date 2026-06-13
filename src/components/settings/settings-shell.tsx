@@ -15,6 +15,7 @@ import {
   CalendarClock,
   Inbox,
   KeyRound,
+  MessageSquareText,
   Play,
   Settings2,
   ShieldCheck,
@@ -50,6 +51,7 @@ const NAV: Array<{ group: string; items: NavItem[] }> = [
       { label: "Appuntamenti", href: "/settings/conversazioni/appuntamenti", icon: <CalendarCheck size={15} /> },
       { label: "Invio e protezione numero", href: "/settings/conversazioni/invio", icon: <ShieldCheck size={15} /> },
       { label: "Preferenze Inbox", href: "/settings/conversazioni/inbox", icon: <Inbox size={15} /> },
+      { label: "Template", href: "/settings/conversazioni/template", icon: <MessageSquareText size={15} /> },
     ],
   },
   {
