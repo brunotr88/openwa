@@ -5,11 +5,11 @@
  * `optIn:true` dichiara il consenso per numeri nuovi (registrato in audit).
  */
 import { z } from "zod";
+import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
 import { authenticateApiKey, hasScope } from "@/lib/api-auth";
 import {
   enqueueOutbound,
-  pickSession,
   resolveSendableContact,
   ensureConversation,
 } from "@/lib/outbound/enqueue";
@@ -52,8 +52,14 @@ export async function POST(req: Request): Promise<Response> {
   }
   const b = parsed.data;
 
-  const session = await pickSession(actor.tenantId);
-  if (!session) return Response.json({ error: "no whatsapp session" }, { status: 409 });
+  if (!actor.sessionId) {
+    return Response.json({ error: "number_unavailable", hint: "la API key non è legata a un numero" }, { status: 409 });
+  }
+  const session = await db.waSession.findFirst({
+    where: { id: actor.sessionId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!session) return Response.json({ error: "number_unavailable" }, { status: 409 });
 
   const contact = await resolveSendableContact(actor.tenantId, b.to, b.optIn === true);
   if (!contact.optedIn) {
