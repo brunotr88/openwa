@@ -1,6 +1,7 @@
 /**
  * Idempotent seed (plain JS — runs at container start without a TS runtime).
- * Creates: admin User, demo Tenant, UserTenant link, default AiConfig.
+ * Creates: admin User, demo Tenant, UserTenant link.
+ * Backfills per-number config (WaSession.settings, AiConfig.sessionId, ApiKey.sessionId).
  * Reads ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME from env.
  */
 const { PrismaClient } = require("@prisma/client");
@@ -44,21 +45,52 @@ async function main() {
     create: { userId: user.id, tenantId: tenant.id, role: "ADMIN" },
   });
 
-  // Default AI config for the demo tenant (idempotent on unique tenantId).
-  await db.aiConfig.upsert({
-    where: { tenantId: tenant.id },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      provider: "BEDROCK",
-      modelId: "eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
-      systemPrompt: "Sei un assistente WhatsApp cortese e conciso.",
-      temperature: 0.7,
-      autoReplyEnabled: false,
-    },
-  });
+  await backfillPerNumberConfig(db);
 
   console.log("[seed] Done.");
+}
+
+// --- Backfill per-number config (idempotente) ---
+async function backfillPerNumberConfig(db) {
+  function pickPrimary(sessions) {
+    if (!sessions.length) return null;
+    const byNewest = [...sessions].sort((a, b) => b.createdAt - a.createdAt);
+    return (byNewest.find((s) => s.status === "CONNECTED") ?? byNewest[0]).id;
+  }
+  const tenants = await db.tenant.findMany({ select: { id: true, settings: true } });
+  for (const t of tenants) {
+    const sessions = await db.waSession.findMany({
+      where: { tenantId: t.id, deletedAt: null },
+      select: { id: true, status: true, createdAt: true, settings: true },
+    });
+    if (!sessions.length) continue;
+    for (const s of sessions) {
+      if (s.settings == null && t.settings != null) {
+        await db.waSession.update({ where: { id: s.id }, data: { settings: t.settings } });
+      }
+    }
+    const primaryId = pickPrimary(sessions);
+    const orphan = await db.aiConfig.findFirst({ where: { tenantId: t.id, sessionId: null } });
+    if (orphan && primaryId) {
+      const taken = await db.aiConfig.findUnique({ where: { sessionId: primaryId } });
+      if (!taken) {
+        await db.aiConfig.update({ where: { id: orphan.id }, data: { sessionId: primaryId } });
+      }
+    }
+    for (const s of sessions) {
+      const has = await db.aiConfig.findUnique({ where: { sessionId: s.id } });
+      if (!has) {
+        await db.aiConfig.create({ data: { tenantId: t.id, sessionId: s.id } });
+      }
+    }
+    if (primaryId) {
+      await db.apiKey.updateMany({
+        where: { tenantId: t.id, sessionId: null, deletedAt: null },
+        data: { sessionId: primaryId },
+      });
+    }
+  }
+  console.log("[seed] backfill per-number config: done");
 }
 
 main()

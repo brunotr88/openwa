@@ -133,6 +133,8 @@ export async function POST(req: Request): Promise<Response> {
     },
   });
 
+  await db.aiConfig.create({ data: { tenantId, sessionId: waSession.id } });
+
   await auditLog({
     userId: actor.userId,
     tenantId,
