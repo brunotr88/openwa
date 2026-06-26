@@ -10,12 +10,12 @@ import { auditLog } from "@/lib/audit";
 import { sendText } from "@/lib/wa/gateway-client";
 import { getProvider } from "@/lib/ai";
 import {
-  getTenantSettings,
   buildSystemPrompt,
   isWithinSchedule,
   styleTemperature,
   lengthMaxTokens,
 } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
 import { renderTemplate } from "./template";
 import { evaluateSendEligibility, isJobExpired, backoffDelayMs } from "./pacing";
 import type { OutboundPayload } from "./types";
@@ -103,18 +103,19 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     return "failed";
   }
 
-  const settings = await getTenantSettings(job.tenantId);
+  const settings = await getSessionSettings(job.sessionId);
 
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
   const startOfHour = new Date(now);
   startOfHour.setMinutes(0, 0, 0);
-  // NB: cap e spacing sono aggregati PER-TENANT (non per-sessione) — più
-  // conservativi (mai sovra-invio) e condivisi con le risposte AI in entrata.
+  // NB: cap e spacing sono aggregati PER-SESSIONE (numero) — ogni numero ha i
+  // propri limiti anti-ban, condivisi con le risposte AI in entrata del numero.
+  const sessionFilter = { conversation: { sessionId: job.sessionId } } as const;
   const [sentToday, sentThisHour, lastOut] = await Promise.all([
     db.message.count({
       where: {
-        tenantId: job.tenantId,
+        ...sessionFilter,
         direction: "OUT",
         status: { in: ["SENT", "DELIVERED", "READ"] },
         createdAt: { gte: startOfDay },
@@ -122,7 +123,7 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     }),
     db.message.count({
       where: {
-        tenantId: job.tenantId,
+        ...sessionFilter,
         direction: "OUT",
         status: { in: ["SENT", "DELIVERED", "READ"] },
         createdAt: { gte: startOfHour },
@@ -130,7 +131,7 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     }),
     db.message.findFirst({
       where: {
-        tenantId: job.tenantId,
+        ...sessionFilter,
         direction: "OUT",
         status: { in: ["SENT", "DELIVERED", "READ"] },
       },
@@ -252,9 +253,10 @@ async function resolveBody(
     mode: string;
     payload: unknown;
     tenantId: string;
+    sessionId: string;
     contact: { name: string | null; profileSummary: string | null };
   },
-  settings: Awaited<ReturnType<typeof getTenantSettings>>
+  settings: Awaited<ReturnType<typeof getSessionSettings>>
 ): Promise<string> {
   const payload = job.payload as OutboundPayload;
   if (payload.mode === "TEXT") return payload.text;
@@ -272,7 +274,7 @@ async function resolveBody(
     return renderTemplate(tpl.body, vars);
   }
 
-  const aiConfig = await db.aiConfig.findFirst({ where: { tenantId: job.tenantId } });
+  const aiConfig = await db.aiConfig.findUnique({ where: { sessionId: job.sessionId } });
   if (!aiConfig) throw new Error("no AiConfig for intent compose");
   const system = buildSystemPrompt(settings, {
     contactSummary: [
