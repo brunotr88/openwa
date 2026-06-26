@@ -5,7 +5,7 @@ import { createHmac } from "crypto";
 
 const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
   mockDb: {
-    waSession: { findFirst: vi.fn(), update: vi.fn() },
+    waSession: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     contact: { upsert: vi.fn(), update: vi.fn() },
     tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
@@ -87,6 +87,13 @@ beforeEach(() => {
   mockDb.tenant.findUnique.mockResolvedValue({
     settings: { behavior: { aiMode: "AUTO" } },
   });
+  // getSessionSettings (route → settings per-numero) legge waSession.findUnique
+  // e ripiega su tenant.settings: deleghiamo al mock tenant esistente così gli
+  // override `tenant.findUnique` dei singoli test restano validi.
+  mockDb.waSession.findUnique.mockImplementation(async () => ({
+    settings: null,
+    tenant: await mockDb.tenant.findUnique(),
+  }));
   mockDb.conversation.findFirst.mockResolvedValue(null);
   mockDb.conversation.create.mockResolvedValue({ id: "conv1", mode: "AUTO" });
   mockDb.conversation.update.mockResolvedValue({});
