@@ -29,7 +29,7 @@ import { generateAndDeliverReply } from "@/lib/wa/reply";
 import { shouldIgnoreInbound, normalizeWaId } from "@/lib/wa/inbound-filter";
 import { getContact } from "@/lib/wa/gateway-client";
 import { mapGatewayContact, resolutionPatch } from "@/lib/wa/contact-resolve";
-import { getTenantSettings } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
 import type { WaSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -90,7 +90,7 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     return;
   }
 
-  const settings = await getTenantSettings(session.tenantId);
+  const settings = await getSessionSettings(session.id);
   if (shouldIgnoreInbound(data, settings)) return;
 
   // Original chat id WITH its suffix (@lid / @c.us / @s.whatsapp.net) — needed
