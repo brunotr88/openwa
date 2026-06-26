@@ -10,6 +10,7 @@ import { hashApiKey, verifyApiKey } from "@/lib/apikey";
 export interface ApiKeyActor {
   keyId: string;
   tenantId: string;
+  sessionId: string | null;
   scopes: string[];
 }
 
@@ -27,7 +28,12 @@ export async function authenticateApiKey(req: Request): Promise<ApiKeyActor | nu
     .update({ where: { id: record.id }, data: { lastUsedAt: new Date() } })
     .catch(() => undefined);
 
-  return { keyId: record.id, tenantId: record.tenantId, scopes: record.scopes };
+  return {
+    keyId: record.id,
+    tenantId: record.tenantId,
+    sessionId: record.sessionId,
+    scopes: record.scopes,
+  };
 }
 
 export function hasScope(actor: ApiKeyActor, scope: string): boolean {
