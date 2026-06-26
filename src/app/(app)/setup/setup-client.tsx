@@ -498,15 +498,17 @@ function Wizard({ hasConnectedSession }: { hasConnectedSession: boolean }) {
 
 export function SetupClient({
   tenantId,
+  sessionId,
   initialSettings,
   hasConnectedSession,
 }: {
   tenantId: string;
+  sessionId: string;
   initialSettings: TenantSettings;
   hasConnectedSession: boolean;
 }) {
   return (
-    <SettingsProvider tenantId={tenantId} initialSettings={initialSettings}>
+    <SettingsProvider tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
       <Wizard hasConnectedSession={hasConnectedSession} />
     </SettingsProvider>
   );

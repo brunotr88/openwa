@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { TenantSettings } from "@/lib/settings/schema";
 import { SettingsProvider, SaveToast } from "./settings-context";
+import { NumberSwitcher } from "./number-switcher";
 import { BotPlayground } from "./bot-playground";
 
 interface NavItem {
@@ -75,10 +76,14 @@ const FLAT_ITEMS = NAV.flatMap((g) => g.items);
 
 export function SettingsShell({
   tenantId,
+  sessionId,
+  numbers,
   initialSettings,
   children,
 }: {
   tenantId: string;
+  sessionId: string;
+  numbers: { id: string; phoneLabel: string; status: string }[];
   initialSettings: TenantSettings;
   children: React.ReactNode;
 }) {
@@ -86,7 +91,7 @@ export function SettingsShell({
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
 
   return (
-    <SettingsProvider tenantId={tenantId} initialSettings={initialSettings}>
+    <SettingsProvider tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
       {/* Mobile: title + chip row */}
       <div className="mb-4 md:hidden">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -100,6 +105,7 @@ export function SettingsShell({
             Prova
           </button>
         </div>
+        <NumberSwitcher numbers={numbers} current={sessionId} />
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {FLAT_ITEMS.map((item) =>
             item.soon || !item.href ? (
@@ -142,6 +148,8 @@ export function SettingsShell({
               <Play size={14} />
               Prova il bot
             </button>
+
+            <NumberSwitcher numbers={numbers} current={sessionId} />
 
             <nav className="space-y-5">
               {NAV.map((group) => (

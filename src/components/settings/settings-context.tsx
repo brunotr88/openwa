@@ -20,6 +20,7 @@ export type SaveState = "idle" | "saving" | "saved" | "error";
 
 interface SettingsCtx {
   tenantId: string;
+  sessionId: string;
   settings: TenantSettings;
   saveState: SaveState;
   /** Update ottimistico + persist. Ritorna true se il salvataggio è andato. */
@@ -36,10 +37,12 @@ export function useSettings(): SettingsCtx {
 
 export function SettingsProvider({
   tenantId,
+  sessionId,
   initialSettings,
   children,
 }: {
   tenantId: string;
+  sessionId: string;
   initialSettings: TenantSettings;
   children: React.ReactNode;
 }) {
@@ -62,7 +65,7 @@ export function SettingsProvider({
         const res = await fetch("/api/settings", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tenantId, settings: patch }),
+          body: JSON.stringify({ sessionId, settings: patch }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { settings: TenantSettings };
@@ -77,11 +80,11 @@ export function SettingsProvider({
         return false;
       }
     },
-    [settings, tenantId]
+    [settings, sessionId]
   );
 
   return (
-    <Ctx.Provider value={{ tenantId, settings, saveState, save }}>
+    <Ctx.Provider value={{ tenantId, sessionId, settings, saveState, save }}>
       {children}
     </Ctx.Provider>
   );

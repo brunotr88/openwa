@@ -4,7 +4,8 @@
  */
 import { redirect } from "next/navigation";
 import { getActor, resolveTenantId } from "@/lib/authz";
-import { getTenantSettings } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
+import { pickPrimarySession } from "@/lib/sessions/primary";
 import { db } from "@/lib/db";
 import { SetupChecklist } from "@/components/settings/setup-checklist";
 import { InboxClient } from "./inbox-client";
@@ -15,18 +16,22 @@ export default async function InboxPage() {
   const actor = await getActor();
   if (!actor) redirect("/login");
 
-  // Setup checklist finché il wizard non è completato.
+  // Setup checklist finché il wizard non è completato (sul numero primario).
   let checklist: React.ReactNode = null;
   const tenantId = await resolveTenantId(actor);
   if (tenantId) {
-    const settings = await getTenantSettings(tenantId);
+    const numbers = await db.waSession.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, status: true, createdAt: true },
+    });
+    const primaryId = pickPrimarySession(numbers);
+    const settings = primaryId
+      ? await getSessionSettings(primaryId)
+      : (await import("@/lib/settings")).parseTenantSettings(null);
     if (!settings.setup.completed) {
-      const connected = await db.waSession.findFirst({
-        where: { tenantId, status: "CONNECTED", deletedAt: null },
-        select: { id: true },
-      });
+      const hasConnectedSession = numbers.some((n) => n.status === "CONNECTED");
       checklist = (
-        <SetupChecklist settings={settings} hasConnectedSession={Boolean(connected)} />
+        <SetupChecklist settings={settings} hasConnectedSession={hasConnectedSession} />
       );
     }
   }
