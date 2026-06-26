@@ -15,6 +15,8 @@ interface ApiKeyRow {
   scopes: string[];
   lastUsedAt: string | null;
   createdAt: string;
+  sessionId?: string;
+  session?: { phoneLabel: string } | null;
 }
 
 export default function SviluppatoriPage() {
@@ -23,6 +25,8 @@ export default function SviluppatoriPage() {
   const [created, setCreated] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [numbers, setNumbers] = useState<{ id: string; phoneLabel: string; status: string }[]>([]);
+  const [sessionId, setSessionId] = useState<string>("");
 
   async function load() {
     const r = await fetch("/api/apikeys");
@@ -31,6 +35,15 @@ export default function SviluppatoriPage() {
   useEffect(() => {
     void load();
   }, []);
+  useEffect(() => {
+    fetch("/api/sessions")
+      .then((r) => r.json())
+      .then((d) => {
+        setNumbers(d.sessions ?? []);
+        if (d.sessions?.[0]) setSessionId(d.sessions[0].id);
+      })
+      .catch(() => {});
+  }, []);
 
   async function create() {
     if (!label.trim()) return;
@@ -38,7 +51,7 @@ export default function SviluppatoriPage() {
     const r = await fetch("/api/apikeys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: label.trim(), scopes: ["messages:send"] }),
+      body: JSON.stringify({ label: label.trim(), scopes: ["messages:send"], sessionId }),
     });
     setLoading(false);
     if (r.ok) {
@@ -89,10 +102,23 @@ export default function SviluppatoriPage() {
             placeholder="Etichetta (es. CRM interno)"
             className="flex-1 rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm focus:border-primary/50 md:text-sm"
           />
+          <select
+            value={sessionId}
+            onChange={(e) => setSessionId(e.target.value)}
+            className="rounded-xl border border-border bg-surface px-3 py-2.5 text-base shadow-sm md:text-sm"
+            aria-label="Numero per la key"
+          >
+            {numbers.length === 0 && <option value="">Nessun numero collegato</option>}
+            {numbers.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.phoneLabel} ({n.status})
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={create}
-            disabled={loading || !label.trim()}
+            disabled={loading || !label.trim() || !sessionId}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
           >
             <KeyRound size={16} />
@@ -109,7 +135,7 @@ export default function SviluppatoriPage() {
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-ink">{k.label}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  <code>{k.prefix}…</code> · {k.scopes.join(", ")} ·{" "}
+                  <code>{k.prefix}…</code> · numero {k.session?.phoneLabel ?? "—"} · {k.scopes.join(", ")} ·{" "}
                   {k.lastUsedAt ? `usata ${new Date(k.lastUsedAt).toLocaleDateString("it-IT")}` : "mai usata"}
                 </p>
               </div>
