@@ -18,7 +18,6 @@ import {
   buildAppointmentTools,
 } from "@/lib/appointments/tools";
 import {
-  getTenantSettings,
   parseTenantSettings,
   deepMerge,
   buildSystemPrompt,
@@ -27,11 +26,14 @@ import {
   getPreset,
   MODEL_HAIKU,
 } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
+import { pickPrimarySession } from "@/lib/sessions/primary";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   tenantId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
   messages: z
     .array(
       z.object({
@@ -68,7 +70,19 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const saved = await getTenantSettings(tenantId);
+  let sessionId = parsed.data.sessionId ?? null;
+  if (!sessionId) {
+    const sessions = await db.waSession.findMany({
+      where: { tenantId, deletedAt: null },
+      select: { id: true, status: true, createdAt: true },
+    });
+    sessionId = pickPrimarySession(sessions);
+  }
+  if (!sessionId) {
+    return Response.json({ error: "no number available" }, { status: 409 });
+  }
+
+  const saved = await getSessionSettings(sessionId);
   const settings = parsed.data.draftSettings
     ? parseTenantSettings(deepMerge(saved, parsed.data.draftSettings))
     : saved;
@@ -79,7 +93,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "last message must be from user" }, { status: 400 });
   }
 
-  const aiConfig = await db.aiConfig.findFirst({ where: { tenantId } });
+  const aiConfig = await db.aiConfig.findUnique({ where: { sessionId } });
   const preset = getPreset(settings.persona.presetId);
   const modelId = aiConfig?.modelId ?? preset?.recommendedModelId ?? MODEL_HAIKU;
 
