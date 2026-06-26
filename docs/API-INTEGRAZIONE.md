@@ -16,20 +16,58 @@ all'API privata di OpenWA per **far inviare messaggi WhatsApp** ai contatti.
 ## 1. Ottenere una API key
 
 1. Accedi a OpenWA → **Impostazioni → Sviluppatori**.
-2. Inserisci un'etichetta (es. `CRM aziendale`) e premi **Crea key**.
+2. **Scegli il numero** (sessione WhatsApp) da cui la key invierà, inserisci un'etichetta
+   (es. `CRM aziendale`) e premi **Crea key**.
 3. **Copia subito** la chiave mostrata (formato `owa_live_...`): viene visualizzata **una sola volta**,
    nel database resta solo il suo hash. Se la perdi, creane una nuova e revoca la vecchia.
 
-La chiave è **per‑tenant** (workspace) e va inviata nell'header `X-Api-Key` di ogni richiesta. Per
-revocarla, di nuovo da **Impostazioni → Sviluppatori → Revoca**: le app che la usano smettono di
-funzionare immediatamente.
+**Una key = un numero.** Ogni chiave è **legata al numero scelto alla creazione**: il numero mittente
+degli invii è determinato dalla key, non si passa nella richiesta. Per inviare da più numeri, crea una
+key per ciascun numero. La chiave va inviata nell'header `X-Api-Key` di ogni richiesta. Per revocarla,
+di nuovo da **Impostazioni → Sviluppatori → Revoca**: le app che la usano smettono di funzionare
+immediatamente.
+
+> Per sapere da quale numero invii con una certa key, chiama `GET /api/v1/me` (vedi §1bis).
 
 > Conserva la chiave come un segreto (variabile d'ambiente lato server, **mai** nel frontend / codice
 > pubblico). Lo scope attualmente assegnato è `messages:send`.
 
 ---
 
+## 1bis. Sapere da che numero invii — `GET /api/v1/me`
+
+Poiché il numero mittente è determinato dalla key, usa questo endpoint per scoprire **a quale numero**
+è legata la chiave che stai usando (utile per mostrarlo nel CRM o per validare la configurazione).
+
+### `GET /api/v1/me`
+
+**Headers:** `X-Api-Key: owa_live_...`
+
+**Risposta — `200 OK`**
+```json
+{
+  "sessionId": "cmqctuya30005p90150f5ts5l",
+  "phoneLabel": "Principale",
+  "status": "CONNECTED",
+  "scopes": ["messages:send"]
+}
+```
+
+| Campo | Descrizione |
+|---|---|
+| `sessionId` | ID interno della sessione/numero legato alla key. |
+| `phoneLabel` | Etichetta del numero (quella scelta in OpenWA). |
+| `status` | Stato della sessione WhatsApp (es. `CONNECTED`, `DISCONNECTED`). |
+| `scopes` | Scope assegnati alla key (es. `messages:send`). |
+
+Se la key non è più legata a un numero valido, ricevi `409 number_unavailable` (vedi §6).
+
+---
+
 ## 2. Inviare un messaggio
+
+> **Numero mittente:** non esiste un campo `from`. Il numero da cui parte il messaggio è quello
+> **legato alla key** usata (vedi §1). Per inviare da un altro numero, usa la key di quel numero.
 
 ### `POST /api/v1/messages`
 
@@ -262,6 +300,7 @@ Salva il `jobId` sul record e aggiorna lo stato via polling (§3) o mostra "in c
 | `401` | `unauthorized` | `X-Api-Key` mancante o sconosciuta/revocata | Verifica la chiave |
 | `403` | `forbidden` (`need: messages:send`) | La key non ha lo scope di invio | Usa una key con scope `messages:send` |
 | `403` | `opt_in_required` | Contatto nuovo senza consenso | Passa `optIn: true` se hai il consenso (§4) |
+| `409` | `number_unavailable` | La key non è legata a un numero valido (numero rimosso/non trovato) | Crea una nuova key sul numero giusto in **Impostazioni → Sviluppatori** |
 | `409` | `no whatsapp session` | Nessuna sessione WhatsApp collegata nel workspace | Collega/riattiva la sessione in OpenWA |
 | `5xx` | — | Errore temporaneo | Ritenta con backoff |
 
@@ -284,6 +323,7 @@ Salva il `jobId` sul record e aggiorna lo stato via polling (§3) o mostra "in c
 
 | Metodo | Endpoint | Scopo | Auth |
 |---|---|---|---|
+| `GET` | `/api/v1/me` | Numero (sessione) legato alla key → `{ sessionId, phoneLabel, status, scopes }` | `X-Api-Key` |
 | `POST` | `/api/v1/messages` | Accoda un invio (text/template/intent) → `202 { jobId }` | `X-Api-Key` (scope `messages:send`) |
 | `GET` | `/api/v1/messages/{jobId}` | Stato e consegna di un invio | `X-Api-Key` |
 
