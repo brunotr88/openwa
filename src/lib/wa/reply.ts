@@ -195,7 +195,7 @@ export async function generateAndDeliverReply(
   startOfDay.setHours(0, 0, 0, 0);
   const sentToday = await db.message.count({
     where: {
-      tenantId: conversation.tenantId,
+      conversation: { sessionId: conversation.sessionId },
       direction: "OUT",
       aiGenerated: true,
       status: { in: ["SENT", "DELIVERED", "READ"] },

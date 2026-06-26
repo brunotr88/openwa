@@ -267,12 +267,12 @@ describe("escalation — dailyCap forces DRAFT", () => {
     );
   });
 
-  it("counts only today's OUT aiGenerated sends, tenant-scoped", async () => {
+  it("counts only today's OUT aiGenerated sends, session-scoped", async () => {
     await generateAndDeliverReply("conv1");
     expect(mockDb.message.count).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          tenantId: "t1",
+          conversation: { sessionId: "wa1" },
           direction: "OUT",
           aiGenerated: true,
           createdAt: { gte: expect.any(Date) },

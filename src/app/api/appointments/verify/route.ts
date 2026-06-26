@@ -8,13 +8,16 @@ import { z } from "zod";
 import { auditLog } from "@/lib/audit";
 import { getActor, resolveTenantId } from "@/lib/authz";
 import { rateLimit } from "@/lib/rate-limit";
-import { getTenantSettings } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
+import { pickPrimarySession } from "@/lib/sessions/primary";
+import { db } from "@/lib/db";
 import { GoogleCalendarProvider } from "@/lib/appointments";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   tenantId: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
   /** calendarId da provare (anche non ancora salvato). */
   calendarId: z.string().min(1).max(200).optional(),
 });
@@ -42,9 +45,20 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  const settings = await getTenantSettings(tenantId);
+  const requestedSession = parsed.data.sessionId;
+  const sessions = await db.waSession.findMany({
+    where: { tenantId, deletedAt: null },
+    select: { id: true, status: true, createdAt: true },
+  });
+  const sessionId =
+    (requestedSession && sessions.some((s) => s.id === requestedSession) && requestedSession) ||
+    pickPrimarySession(sessions);
+
+  const settings = sessionId
+    ? await getSessionSettings(sessionId)
+    : null;
   const calendarId =
-    parsed.data.calendarId?.trim() || settings.appointments.googleCalendarId.trim();
+    parsed.data.calendarId?.trim() || (settings?.appointments.googleCalendarId.trim() ?? "");
   if (!calendarId) {
     return Response.json({
       ok: false,
