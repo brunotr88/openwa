@@ -22,7 +22,6 @@ import {
   buildAppointmentTools,
 } from "@/lib/appointments/tools";
 import {
-  getTenantSettings,
   buildSystemPrompt,
   matchEscalationKeyword,
   autoSendAllowedNow,
@@ -31,6 +30,7 @@ import {
   lengthMaxTokens,
   type TenantSettings,
 } from "@/lib/settings";
+import { getSessionSettings } from "@/lib/settings/session";
 import { sendText } from "./gateway-client";
 
 /** Hard cap sul ritardo "umano" prima dell'invio (whatsapp-ops: max 10 s). */
@@ -152,11 +152,11 @@ export async function generateAndDeliverReply(
   if (!conversation) return null;
   if (conversation.mode === "MANUAL") return null;
 
-  const settings = await getTenantSettings(conversation.tenantId);
+  const settings = await getSessionSettings(conversation.sessionId);
   if (settings.behavior.aiMode === "OFF") return null;
 
-  const aiConfig = await db.aiConfig.findFirst({
-    where: { tenantId: conversation.tenantId },
+  const aiConfig = await db.aiConfig.findUnique({
+    where: { sessionId: conversation.sessionId },
   });
   if (!aiConfig) return null;
 

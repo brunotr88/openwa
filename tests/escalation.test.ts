@@ -5,9 +5,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
     conversation: { findUnique: vi.fn(), update: vi.fn() },
-    aiConfig: { findFirst: vi.fn() },
+    aiConfig: { findUnique: vi.fn() },
     message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     tenant: { findUnique: vi.fn(), update: vi.fn() },
+    waSession: { findUnique: vi.fn() },
   },
   mockSendText: vi.fn(),
   mockGenerate: vi.fn(),
@@ -75,7 +76,7 @@ beforeEach(() => {
   });
   mockDb.conversation.findUnique.mockResolvedValue(conversation);
   mockDb.conversation.update.mockResolvedValue({});
-  mockDb.aiConfig.findFirst.mockResolvedValue({
+  mockDb.aiConfig.findUnique.mockResolvedValue({
     tenantId: "t1",
     provider: "BEDROCK",
     modelId: "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -88,6 +89,13 @@ beforeEach(() => {
       sending: { randomDelay: false },
     },
   });
+  // getSessionSettings legge waSession.findUnique e ripiega su tenant.settings
+  // quando il numero non ha override: deleghiamo al mock tenant esistente così
+  // tutti gli override `tenant.findUnique` dei singoli test restano validi.
+  mockDb.waSession.findUnique.mockImplementation(async () => ({
+    settings: null,
+    tenant: await mockDb.tenant.findUnique(),
+  }));
   mockDb.message.findMany.mockResolvedValue([inbound("Che orari fate?")]);
   mockDb.message.count.mockResolvedValue(0);
   mockDb.message.create.mockResolvedValue({ id: "out1" });
