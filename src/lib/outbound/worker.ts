@@ -272,7 +272,7 @@ async function resolveBody(
     return renderTemplate(tpl.body, vars);
   }
 
-  const aiConfig = await db.aiConfig.findUnique({ where: { tenantId: job.tenantId } });
+  const aiConfig = await db.aiConfig.findFirst({ where: { tenantId: job.tenantId } });
   if (!aiConfig) throw new Error("no AiConfig for intent compose");
   const system = buildSystemPrompt(settings, {
     contactSummary: [

@@ -167,6 +167,7 @@ model WaSession {
   phoneLabel     String
   status         WaSessionStatus @default(OFFLINE)
   sessionDataRef String?         // encrypted reference to session file path
+  settings       Json?           // TenantSettings shape — config del numero (per-bot)
   lastSeenAt     DateTime?
   createdAt      DateTime        @default(now())
   deletedAt      DateTime?
@@ -175,6 +176,8 @@ model WaSession {
   conversations Conversation[]
   campaigns    Campaign[]
   outboundJobs OutboundJob[]
+  aiConfig      AiConfig?
+  apiKeys       ApiKey[]
 
   @@index([tenantId])
   @@index([status])
@@ -253,7 +256,8 @@ model Message {
 
 model AiConfig {
   id                 String         @id @default(cuid())
-  tenantId           String         @unique
+  tenantId           String
+  sessionId          String?        @unique
   provider           AiProviderType @default(BEDROCK)
   modelId            String         @default("eu.anthropic.claude-sonnet-4-5-20250929-v1:0")
   systemPrompt       String?
@@ -262,7 +266,8 @@ model AiConfig {
   businessHours      Json?          // { timezone, days, startHour, endHour }
   updatedAt          DateTime       @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant  Tenant     @relation(fields: [tenantId], references: [id])
+  session WaSession? @relation(fields: [sessionId], references: [id])
 
   @@index([tenantId])
 }
@@ -295,6 +300,7 @@ model AuditLog {
 model ApiKey {
   id         String    @id @default(cuid())
   tenantId   String
+  sessionId  String?
   hashedKey  String    @unique          // sha256(plaintext) hex
   prefix     String                      // primi 12 char del plaintext, per display
   label      String
@@ -303,7 +309,8 @@ model ApiKey {
   createdAt  DateTime  @default(now())
   deletedAt  DateTime?
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant  Tenant     @relation(fields: [tenantId], references: [id])
+  session WaSession? @relation(fields: [sessionId], references: [id])
 
   @@index([tenantId])
 }

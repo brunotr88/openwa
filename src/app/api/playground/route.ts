@@ -79,7 +79,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "last message must be from user" }, { status: 400 });
   }
 
-  const aiConfig = await db.aiConfig.findUnique({ where: { tenantId } });
+  const aiConfig = await db.aiConfig.findFirst({ where: { tenantId } });
   const preset = getPreset(settings.persona.presetId);
   const modelId = aiConfig?.modelId ?? preset?.recommendedModelId ?? MODEL_HAIKU;
 

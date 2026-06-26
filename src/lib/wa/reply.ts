@@ -155,7 +155,7 @@ export async function generateAndDeliverReply(
   const settings = await getTenantSettings(conversation.tenantId);
   if (settings.behavior.aiMode === "OFF") return null;
 
-  const aiConfig = await db.aiConfig.findUnique({
+  const aiConfig = await db.aiConfig.findFirst({
     where: { tenantId: conversation.tenantId },
   });
   if (!aiConfig) return null;

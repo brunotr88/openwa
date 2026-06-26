@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
     conversation: { findUnique: vi.fn(), update: vi.fn() },
-    aiConfig: { findUnique: vi.fn() },
+    aiConfig: { findFirst: vi.fn() },
     message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     tenant: { findUnique: vi.fn(), update: vi.fn() },
   },
@@ -75,7 +75,7 @@ beforeEach(() => {
   });
   mockDb.conversation.findUnique.mockResolvedValue(conversation);
   mockDb.conversation.update.mockResolvedValue({});
-  mockDb.aiConfig.findUnique.mockResolvedValue({
+  mockDb.aiConfig.findFirst.mockResolvedValue({
     tenantId: "t1",
     provider: "BEDROCK",
     modelId: "eu.anthropic.claude-haiku-4-5-20251001-v1:0",

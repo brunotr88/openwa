@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
     conversation: { findUnique: vi.fn(), update: vi.fn() },
-    aiConfig: { findUnique: vi.fn() },
+    aiConfig: { findFirst: vi.fn() },
     message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     tenant: { findUnique: vi.fn(), update: vi.fn() },
   },
@@ -112,7 +112,7 @@ afterEach(() => {
 describe("generateAndDeliverReply — AUTO", () => {
   beforeEach(() => {
     mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
-    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.aiConfig.findFirst.mockResolvedValue(aiConfigFixture());
   });
 
   it("creates Message(OUT, QUEUED, aiGenerated), sends via gateway, marks SENT", async () => {
@@ -275,7 +275,7 @@ describe("generateAndDeliverReply — AUTO", () => {
 describe("generateAndDeliverReply — COPILOT", () => {
   it("creates a DRAFT only and never calls the gateway", async () => {
     mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("COPILOT"));
-    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.aiConfig.findFirst.mockResolvedValue(aiConfigFixture());
 
     const id = await generateAndDeliverReply("conv1");
     expect(id).toBe("out1");
@@ -313,14 +313,14 @@ describe("generateAndDeliverReply — MANUAL / edge cases", () => {
 
   it("does nothing when the tenant has no AiConfig", async () => {
     mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
-    mockDb.aiConfig.findUnique.mockResolvedValue(null);
+    mockDb.aiConfig.findFirst.mockResolvedValue(null);
     expect(await generateAndDeliverReply("conv1")).toBeNull();
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
   it("does nothing when the last message is not from the user", async () => {
     mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
-    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.aiConfig.findFirst.mockResolvedValue(aiConfigFixture());
     mockDb.message.findMany.mockResolvedValue([
       {
         direction: "OUT",
@@ -339,7 +339,7 @@ describe("generateAndDeliverReply — MANUAL / edge cases", () => {
 describe("generateAndDeliverReply — appointments wiring", () => {
   beforeEach(() => {
     mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
-    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.aiConfig.findFirst.mockResolvedValue(aiConfigFixture());
   });
 
   it("calendly_link: appends the link instruction to the system prompt, no tools", async () => {
