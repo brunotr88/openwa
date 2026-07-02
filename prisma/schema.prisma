@@ -388,3 +388,9 @@ model OutboundJob {
   @@index([sessionId, status])
   @@index([campaignId])
 }
+
+model WebhookDelivery {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  createdAt DateTime @default(now())
+}

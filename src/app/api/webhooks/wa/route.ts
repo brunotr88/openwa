@@ -23,7 +23,7 @@
  * - *@lid → contatto normale, waId senza suffisso
  * - fromMe → IGNORA (loop!)
  */
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { generateAndDeliverReply } from "@/lib/wa/reply";
 import { shouldIgnoreInbound, normalizeWaId } from "@/lib/wa/inbound-filter";
@@ -237,6 +237,22 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "invalid payload" }, { status: 400 });
   }
 
+  // Idempotenza: un retry del gateway (stessa delivery) non deve rieseguire il
+  // handler → niente doppio Message IN né doppia risposta AI. Chiave stabile su
+  // idempotencyKey/deliveryId, fallback all'hash del raw body (già usato per HMAC).
+  const dedupeKey =
+    envelope.idempotencyKey ||
+    envelope.deliveryId ||
+    createHash("sha256").update(rawBody).digest("hex");
+  try {
+    await db.webhookDelivery.create({ data: { key: dedupeKey } });
+  } catch (e) {
+    if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+      return Response.json({ ok: true, deduped: true });
+    }
+    throw e;
+  }
+
   try {
     switch (envelope.event) {
       case "message.received":
@@ -251,8 +267,10 @@ export async function POST(req: Request): Promise<Response> {
         break; // ignore unhandled events (test, message.ack, ...)
     }
   } catch (e) {
-    // Always 200 after signature check: gateway retries won't help app-side bugs.
+    // Con l'idempotenza (B1) i retry sono sicuri: su errori inattesi rispondi 500
+    // così il gateway riprova invece di perdere per sempre l'inbound.
     console.error(`[webhook/wa] handler error for ${envelope.event}:`, e);
+    return Response.json({ error: "internal error" }, { status: 500 });
   }
 
   return Response.json({ ok: true });
