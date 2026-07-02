@@ -32,7 +32,7 @@ import {
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
 import { zonedDate, zonedToUtc } from "@/lib/appointments/slots";
-import { sendText } from "./gateway-client";
+import { sendText, contactChatId } from "./gateway-client";
 
 /** Hard cap sul ritardo "umano" prima dell'invio (whatsapp-ops: max 10 s). */
 const MAX_RANDOM_DELAY_MS = 10_000;
@@ -340,8 +340,12 @@ export async function generateAndDeliverReply(
     if (!gwSessionId) {
       throw new Error(`WaSession ${conversation.sessionId} has no gateway session ref`);
     }
+    const chatId = contactChatId(conversation.contact);
+    if (!chatId) {
+      throw new Error(`contact ${conversation.contact.id} has no sendable chat id`);
+    }
     await humanDelay(settings);
-    await sendText(gwSessionId, conversation.contact.phone ?? conversation.contact.waId, text);
+    await sendText(gwSessionId, chatId, text);
     await db.message.update({
       where: { id: message.id },
       data: { status: "SENT" },

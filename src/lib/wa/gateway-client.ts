@@ -184,6 +184,17 @@ export async function sendText(
   });
 }
 
+/** Chat id di destinazione per un contatto: usa il telefono reale; se assente,
+ *  il waId col suffisso corretto (@lid se è un LID, @c.us se è un numero). */
+export function contactChatId(contact: { phone: string | null; waId: string }): string | null {
+  if (contact.phone) return `${contact.phone.replace(/^\+/, "")}@c.us`;
+  const waId = contact.waId;
+  if (waId.includes("@")) return waId;                 // già con suffisso
+  if (/^\d{6,13}$/.test(waId)) return `${waId}@c.us`;  // sembra un numero E.164
+  if (/^\d{14,}$/.test(waId)) return `${waId}@lid`;    // LID (troppo lungo per un numero)
+  return null;                                          // non inviabile
+}
+
 /**
  * Resolve a contact's real name + phone via the gateway.
  *

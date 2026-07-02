@@ -19,6 +19,13 @@ vi.mock("../src/lib/db", () => ({ db: mockDb }));
 vi.mock("../src/lib/audit", () => ({ auditLog: mockAuditLog }));
 vi.mock("../src/lib/wa/gateway-client", () => ({
   sendText: mockSendText,
+  contactChatId: (c: { phone: string | null; waId: string }) => {
+    if (c.phone) return `${c.phone.replace(/^\+/, "")}@c.us`;
+    if (c.waId.includes("@")) return c.waId;
+    if (/^\d{6,13}$/.test(c.waId)) return `${c.waId}@c.us`;
+    if (/^\d{14,}$/.test(c.waId)) return `${c.waId}@lid`;
+    return null;
+  },
 }));
 vi.mock("../src/lib/ai", () => ({
   getProvider: () => ({ generate: mockGenerate }),
@@ -139,7 +146,7 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
     expect(mockSendText).toHaveBeenCalledWith(
       "gw-uuid",
-      "393331234567",
+      "393331234567@c.us",
       "Sì, abbiamo disponibilità!"
     );
     expect(mockDb.message.update).toHaveBeenCalledWith({

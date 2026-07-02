@@ -7,7 +7,7 @@
  */
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
-import { sendText } from "@/lib/wa/gateway-client";
+import { sendText, contactChatId, GatewayError } from "@/lib/wa/gateway-client";
 import { getProvider } from "@/lib/ai";
 import {
   buildSystemPrompt,
@@ -143,7 +143,9 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
   const inbound = await db.message.count({
     where: { conversation: { contactId: job.contactId }, direction: "IN" },
   });
-  const optedIn = job.contact.optInStatus === "IN" || inbound > 0;
+  const optedIn =
+    job.contact.optInStatus !== "OUT" &&
+    (job.contact.optInStatus === "IN" || inbound > 0);
 
   const decision = evaluateSendEligibility({
     sessionStatus: job.session.status,
@@ -201,11 +203,33 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     job.conversationId ??
     (await ensureConversationFor(job.tenantId, job.contactId, job.sessionId));
 
+  // C3: chat id di destinazione corretto (telefono reale, o @lid/@c.us dal waId).
+  // Se non è calcolabile (LID non risolto senza telefono) NON inviamo: FAILED.
+  const chatId = contactChatId(job.contact);
+  if (!chatId) {
+    return await markFailedNoRetry(job.id, job.tenantId, "unsendable_chat_id");
+  }
+
+  // ── Fase 1: INVIO (isolato). Un fallimento qui è classificato: ──────────────
+  //  - GatewayError SENZA status = timeout/network dopo che la richiesta è
+  //    partita → consegna AMBIGUA → fail-closed, MAI ri-inviato (at-most-once).
+  //  - qualsiasi altro errore (ref mancante, GatewayError con 4xx/5xx = rifiuto
+  //    pre-consegna) → retry con backoff come prima.
   try {
     const gwId = job.session.sessionDataRef;
     if (!gwId) throw new Error("session has no gateway ref");
-    await sendText(gwId, job.contact.phone ?? job.contact.waId, finalBody);
+    await sendText(gwId, chatId, finalBody);
+  } catch (e) {
+    if (e instanceof GatewayError && e.status === undefined) {
+      return await markFailedNoRetry(job.id, job.tenantId, "send_ambiguous");
+    }
+    return await markFailed(job.id, job.tenantId, job.attempts, job.maxAttempts, now, e);
+  }
 
+  // ── Fase 2: scritture POST-INVIO (separate). Il messaggio È stato inviato: un
+  //  errore qui NON deve mai ri-schedulare (= re-invio). Lasciamo il job in
+  //  SENDING: il reaper stale-SENDING lo marcherà FAILED (fail-closed). ────────
+  try {
     const message = await db.message.create({
       data: {
         conversationId,
@@ -235,8 +259,40 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     });
     return "sent";
   } catch (e) {
-    return await markFailed(job.id, job.tenantId, job.attempts, job.maxAttempts, now, e);
+    // Inviato ma la persistenza è fallita: NON re-inviare. Restiamo in SENDING
+    // (il reaper marcherà FAILED dopo STALE_SENDING_MS) e lo tracciamo in audit.
+    const error = e instanceof Error ? e.message : String(e);
+    console.error("[outbound] post-send write failed (message already sent):", error);
+    await auditLog({
+      tenantId: job.tenantId,
+      action: "outbound.postSendFailed",
+      entity: "OutboundJob",
+      entityId: job.id,
+      meta: { error, contactId: job.contactId },
+    }).catch(() => {});
+    return "sent";
   }
+}
+
+/** Marca un job FAILED in modo TERMINALE (nessun retry): usato quando un
+ *  re-invio sarebbe rischioso (consegna ambigua) o impossibile (no chat id). */
+async function markFailedNoRetry(
+  jobId: string,
+  tenantId: string,
+  reason: string
+): Promise<JobOutcome> {
+  await db.outboundJob.update({
+    where: { id: jobId },
+    data: { status: "FAILED", lastError: reason },
+  });
+  await auditLog({
+    tenantId,
+    action: "outbound.failed",
+    entity: "OutboundJob",
+    entityId: jobId,
+    meta: { reason, noRetry: true },
+  });
+  return "failed";
 }
 
 async function ensureConversationFor(
