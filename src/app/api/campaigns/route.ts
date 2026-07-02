@@ -40,7 +40,7 @@ const createSchema = z
     templateId: z.string().optional(),
     tags: z.array(z.string()).default([]),
     defaultVars: z.record(z.string()).optional(),
-    scheduledAt: z.string().datetime().optional(),
+    scheduledAt: z.string().datetime({ offset: true }).optional(),
     launchNow: z.boolean().default(true),
   })
   .refine((b) => b.mode !== "text" || (b.body && b.body.length > 0), { message: "body richiesto" })
@@ -60,6 +60,14 @@ export async function POST(req: Request): Promise<Response> {
   if (!session) return Response.json({ error: "no whatsapp session" }, { status: 409 });
 
   const b = parsed.data;
+
+  if (b.mode === "template") {
+    const tpl = await db.template.findFirst({
+      where: { id: b.templateId!, tenantId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!tpl) return Response.json({ error: "template non valido" }, { status: 400 });
+  }
   const campaign = await db.campaign.create({
     data: {
       tenantId,

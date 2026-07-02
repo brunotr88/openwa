@@ -44,11 +44,17 @@ export async function DELETE(
   if (!campaign || !canAccessTenant(actor, campaign.tenantId)) {
     return Response.json({ error: "not_found" }, { status: 404 });
   }
+  // C9: annulla solo se la campagna è ancora attiva (DRAFT/RUNNING); non
+  // sovrascrivere uno status terminale (COMPLETED/CANCELED).
+  const { count } = await db.campaign.updateMany({
+    where: { id, status: { in: ["DRAFT", "RUNNING"] } },
+    data: { status: "CANCELED" },
+  });
+  if (!count) return Response.json({ error: "not_cancelable" }, { status: 409 });
   await db.outboundJob.updateMany({
     where: { campaignId: id, status: "PENDING" },
     data: { status: "CANCELED", lastError: "campaign_canceled" },
   });
-  await db.campaign.update({ where: { id }, data: { status: "CANCELED" } });
   await auditLog({
     userId: actor.userId,
     tenantId: campaign.tenantId,

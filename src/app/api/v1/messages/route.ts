@@ -27,7 +27,7 @@ const bodySchema = z
     intent: z.string().min(1).max(2000).optional(),
     context: z.record(z.unknown()).optional(),
     optIn: z.boolean().optional(),
-    scheduledAt: z.string().datetime().optional(),
+    scheduledAt: z.string().datetime({ offset: true }).optional(),
   })
   .refine((b) => b.mode !== "text" || (b.text && b.text.length > 0), {
     message: "text richiesto per mode=text",
@@ -60,6 +60,14 @@ export async function POST(req: Request): Promise<Response> {
     select: { id: true },
   });
   if (!session) return Response.json({ error: "number_unavailable" }, { status: 409 });
+
+  if (b.mode === "template") {
+    const tpl = await db.template.findFirst({
+      where: { id: b.templateId!, tenantId: actor.tenantId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!tpl) return Response.json({ error: "template non valido" }, { status: 400 });
+  }
 
   const contact = await resolveSendableContact(actor.tenantId, b.to, b.optIn === true);
   if (!contact.optedIn) {
