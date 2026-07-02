@@ -59,6 +59,9 @@ export async function resolveSendableContact(
       },
       select: { id: true, optInStatus: true },
     });
+  } else if (contact.optInStatus === "OUT") {
+    // Opt-out esplicito: un integratore NON può ribaltarlo con optIn:true.
+    return { id: contact.id, optedIn: false };
   } else if (assertOptIn && contact.optInStatus !== "IN") {
     contact = await db.contact.update({
       where: { id: contact.id },

@@ -14,12 +14,23 @@ export interface LaunchResult {
   skipped: number;
 }
 
+/** Rimuove la chiave `tags` (dato di eligibilità) dalle var di template. */
+function stripTags(vars: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(vars)) {
+    if (k === "tags") continue;
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
+}
+
 /** Contatti del tenant eleggibili all'invio (opt-in o con almeno un IN). */
 async function eligibleContacts(tenantId: string, tags: string[]): Promise<{ id: string; name: string | null }[]> {
   const contacts = await db.contact.findMany({
     where: {
       tenantId,
       deletedAt: null,
+      optInStatus: { not: "OUT" }, // opt-out esplicito: mai incluso in campagna
       ...(tags.length > 0 ? { tags: { hasSome: tags } } : {}),
     },
     select: { id: true, name: true, optInStatus: true },
@@ -41,7 +52,14 @@ async function eligibleContacts(tenantId: string, tags: string[]): Promise<{ id:
 export async function launchCampaign(campaignId: string): Promise<LaunchResult> {
   const campaign = await db.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new Error("campaign not found");
-  if (campaign.status !== "DRAFT") throw new Error(`campaign already ${campaign.status}`);
+
+  // C5: CLAIM atomico — una campagna viene lanciata una sola volta anche con
+  // doppio click / retry. Solo chi passa DRAFT→RUNNING procede a mettere in coda.
+  const claimed = await db.campaign.updateMany({
+    where: { id: campaignId, status: "DRAFT" },
+    data: { status: "RUNNING" },
+  });
+  if (claimed.count === 0) throw new Error("campaign not in DRAFT");
 
   const tags = Array.isArray((campaign.defaultVars as { tags?: string[] } | null)?.tags)
     ? ((campaign.defaultVars as { tags?: string[] }).tags as string[])
@@ -56,7 +74,9 @@ export async function launchCampaign(campaignId: string): Promise<LaunchResult> 
         ? {
             mode: "TEMPLATE",
             templateId: campaign.templateId,
-            vars: { nome: c.name ?? "", ...((campaign.defaultVars as Record<string, string>) ?? {}) },
+            // C8: `tags` è un dato di eligibilità, non una var renderizzabile;
+            // e il nome per-contatto deve vincere su un eventuale defaultVars.nome.
+            vars: { ...stripTags((campaign.defaultVars as Record<string, unknown>) ?? {}), nome: c.name ?? "" },
           }
         : { mode: "TEXT", text: campaign.body ?? "" };
 
@@ -74,9 +94,10 @@ export async function launchCampaign(campaignId: string): Promise<LaunchResult> 
     enqueued++;
   }
 
+  // Lo status è già RUNNING dal claim atomico; qui aggiorniamo solo il conteggio.
   await db.campaign.update({
     where: { id: campaign.id },
-    data: { status: "RUNNING", totalRecipients: enqueued },
+    data: { totalRecipients: enqueued },
   });
   await auditLog({
     tenantId: campaign.tenantId,
