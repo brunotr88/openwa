@@ -11,6 +11,7 @@ import { db } from "./db";
 import { authConfig } from "./auth.config";
 import { z } from "zod";
 import { decryptString } from "./crypto";
+import { rateLimit } from "./rate-limit";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -36,6 +37,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const { email, password, totp } = parsed.data;
 
+        // Rate-limit per email: frena il brute-force di password/TOTP anche
+        // prima di toccare il DB (single-instance; vedi rate-limit.ts).
+        if (!rateLimit(`login:${email}`, 10, 60_000).allowed) return null;
+
         const user = await db.user.findUnique({ where: { email } });
         if (!user) return null;
 
@@ -44,8 +49,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const validPassword = await bcrypt.compare(password, user.passwordHash);
-        if (!validPassword) {
+        // Incremento tentativi + lockout dopo MAX_FAILED_ATTEMPTS: usato sia per
+        // password errata sia per TOTP errato (altrimenti il 2FA sarebbe
+        // brute-forcabile senza contatore).
+        const registerFailure = async (): Promise<void> => {
           const attempts = user.failedAttempts + 1;
           await db.user.update({
             where: { id: user.id },
@@ -57,6 +64,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   : null,
             },
           });
+        };
+
+        const validPassword = await bcrypt.compare(password, user.passwordHash);
+        if (!validPassword) {
+          await registerFailure();
           return null;
         }
 
@@ -73,7 +85,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
           const delta = otp.validate({ token: totp ?? "", window: 1 });
-          if (delta === null) return null;
+          if (delta === null) {
+            await registerFailure();
+            return null;
+          }
         }
 
         // Reset failed attempts on success
