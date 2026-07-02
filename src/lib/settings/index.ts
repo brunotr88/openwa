@@ -158,6 +158,8 @@ export function isWithinSchedule(hours: HoursSettings, now: Date = new Date()): 
   const start = parseHHMM(slot.start);
   const end = parseHHMM(slot.end);
   if (start === null || end === null) return true;
+  // Finestra overnight (es. 20:00→02:00): end <= start ⇒ attraversa la mezzanotte.
+  if (end <= start) return hour >= start || hour < end;
   return hour >= start && hour < end;
 }
 

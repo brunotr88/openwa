@@ -328,6 +328,19 @@ describe("isWithinSchedule / autoSendAllowedNow", () => {
     expect(isWithinSchedule(hours, sunday)).toBe(false); // domenica disabilitata
   });
 
+  it("handles overnight windows that wrap past midnight", () => {
+    const schedule = { ...hours.schedule };
+    // Wed (day 3): finestra 20:00 → 02:00 (attraversa la mezzanotte)
+    schedule[3] = { enabled: true, start: "20:00", end: "02:00" };
+    const overnight = { ...hours, schedule };
+    // 22:00 rientra nella finestra serale
+    expect(isWithinSchedule(overnight, wedNight)).toBe(true);
+    // 10:00 è fuori (mattina)
+    expect(isWithinSchedule(overnight, wedMorning)).toBe(false);
+    // 01:00 di mercoledì rientra (coda notturna)
+    expect(isWithinSchedule(overnight, new Date(Date.UTC(2026, 5, 10, 1, 0)))).toBe(true);
+  });
+
   it("ai_sempre always allows auto-send", () => {
     expect(autoSendAllowedNow({ ...hours, afterHoursMode: "ai_sempre" }, wedNight)).toBe(true);
     expect(autoSendAllowedNow({ ...hours, afterHoursMode: "ai_sempre" }, wedMorning)).toBe(true);

@@ -31,6 +31,7 @@ import {
   type TenantSettings,
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
+import { zonedDate, zonedToUtc } from "@/lib/appointments/slots";
 import { sendText } from "./gateway-client";
 
 /** Hard cap sul ritardo "umano" prima dell'invio (whatsapp-ops: max 10 s). */
@@ -163,7 +164,7 @@ export async function generateAndDeliverReply(
   const recent = await db.message.findMany({
     where: {
       conversationId: conversation.id,
-      status: { not: "DRAFT" },
+      status: { notIn: ["DRAFT", "FAILED", "QUEUED"] },
     },
     orderBy: { createdAt: "desc" },
     take: settings.behavior.historyMessages,
@@ -191,8 +192,11 @@ export async function generateAndDeliverReply(
   const aiTurns = countConsecutiveAiTurns(recent);
   const maxTurnsReached = aiTurns >= settings.behavior.maxAiTurns;
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  // Cap giornaliero calcolato nel fuso orario del tenant (settings.hours.timezone),
+  // non nel fuso del server: "inizio di oggi" = mezzanotte locale del tenant.
+  const tz = settings.hours.timezone;
+  const today = zonedDate(new Date(), tz);
+  const startOfDay = zonedToUtc(today.y, today.m, today.d, 0, 0, tz);
   const sentToday = await db.message.count({
     where: {
       conversation: { sessionId: conversation.sessionId },
