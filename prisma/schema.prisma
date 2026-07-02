@@ -228,6 +228,11 @@ model Conversation {
   @@index([tenantId])
   @@index([status])
   @@index([lastMessageAt])
+  // Hot paths: worker/reply contano i Message per sessione/contatto via la
+  // relazione Conversation (join su questi campi) → senza indice = seq scan.
+  @@index([sessionId])
+  @@index([contactId])
+  @@index([tenantId, lastMessageAt])
 }
 
 // ─── Messages ────────────────────────────────────────────────────────────────
