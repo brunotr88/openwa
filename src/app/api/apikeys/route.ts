@@ -5,7 +5,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
-import { getActor, resolveTenantId } from "@/lib/authz";
+import { getActor, resolveTenantId, canAccessTenant } from "@/lib/authz";
 import { generateApiKey } from "@/lib/apikey";
 
 export const dynamic = "force-dynamic";
@@ -38,14 +38,18 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "invalid body" }, { status: 400 });
 
-  const tenantId = await resolveTenantId(actor, parsed.data.tenantId ?? null);
-  if (!tenantId) return Response.json({ error: "no tenant" }, { status: 400 });
-
+  // Il tenant deriva dal numero scelto (non dal "primo tenant" dell'attore):
+  // così un utente multi-tenant/admin può creare key per un numero di un
+  // qualsiasi tenant a cui ha accesso.
   const session = await db.waSession.findFirst({
-    where: { id: parsed.data.sessionId, tenantId, deletedAt: null },
-    select: { id: true },
+    where: { id: parsed.data.sessionId, deletedAt: null },
+    select: { id: true, tenantId: true },
   });
   if (!session) return Response.json({ error: "numero non valido" }, { status: 400 });
+  if (!canAccessTenant(actor, session.tenantId)) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  const tenantId = session.tenantId;
 
   const generated = generateApiKey();
   const created = await db.apiKey.create({

@@ -48,6 +48,16 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
   }
   const edited = finalBody !== message.body;
 
+  // Claim atomico: solo la prima approvazione passa DRAFT→QUEUED. Una seconda
+  // richiesta concorrente trova count=0 e non re-invia (no doppio invio).
+  const claim = await db.message.updateMany({
+    where: { id: message.id, status: "DRAFT" },
+    data: { status: "QUEUED" },
+  });
+  if (claim.count === 0) {
+    return Response.json({ error: "already_processed" }, { status: 409 });
+  }
+
   try {
     await sendText(
       conversation.session.sessionDataRef,

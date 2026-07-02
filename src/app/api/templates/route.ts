@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
 import { getActor, resolveTenantId } from "@/lib/authz";
@@ -50,7 +51,11 @@ export async function POST(req: Request): Promise<Response> {
       meta: { name: tpl.name },
     });
     return Response.json({ template: tpl }, { status: 201 });
-  } catch {
-    return Response.json({ error: "nome già esistente" }, { status: 409 });
+  } catch (e) {
+    // 409 SOLO su violazione di unicità (nome duplicato); altri errori → 500.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return Response.json({ error: "nome già esistente" }, { status: 409 });
+    }
+    throw e;
   }
 }
