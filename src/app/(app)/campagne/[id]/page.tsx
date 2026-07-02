@@ -26,7 +26,8 @@ export default function CampagnaDetailPage() {
 
   async function cancel() {
     if (!confirm("Annullare la campagna? I messaggi non ancora inviati verranno cancellati.")) return;
-    await fetch(`/api/campaigns/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/campaigns/${id}`, { method: "DELETE" });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error ?? "errore");
     void load();
   }
 

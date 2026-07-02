@@ -188,12 +188,25 @@ function Thread({
 
   async function setMode(mode: Mode) {
     if (!thread || mode === thread.mode) return;
+    const previousMode = thread.mode;
     setThread({ ...thread, mode }); // optimistic
-    await fetch(`/api/conversations/${conversationId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode }),
-    }).catch(() => undefined);
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      if (!res.ok) {
+        setThread((t) => (t ? { ...t, mode: previousMode } : t)); // rollback
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        alert(data.error ?? "Impossibile cambiare modalità.");
+        return;
+      }
+    } catch {
+      setThread((t) => (t ? { ...t, mode: previousMode } : t)); // rollback
+      alert("Errore di rete: modalità non cambiata.");
+      return;
+    }
     onChanged();
   }
 

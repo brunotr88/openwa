@@ -48,7 +48,8 @@ export default function TemplatePage() {
 
   async function remove(id: string) {
     if (!confirm("Eliminare il template?")) return;
-    await fetch(`/api/templates/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/templates/${id}`, { method: "DELETE" });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error ?? "errore");
     void load();
   }
 

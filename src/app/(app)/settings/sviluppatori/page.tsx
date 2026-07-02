@@ -48,23 +48,31 @@ export default function SviluppatoriPage() {
   async function create() {
     if (!label.trim()) return;
     setLoading(true);
-    const r = await fetch("/api/apikeys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: label.trim(), scopes: ["messages:send"], sessionId }),
-    });
-    setLoading(false);
-    if (r.ok) {
-      const data = await r.json();
-      setCreated(data.plaintext);
-      setLabel("");
-      void load();
+    try {
+      const r = await fetch("/api/apikeys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: label.trim(), scopes: ["messages:send"], sessionId }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        setCreated(data.plaintext);
+        setLabel("");
+        void load();
+      } else {
+        alert((await r.json().catch(() => ({}))).error ?? "errore");
+      }
+    } catch {
+      alert("Errore di rete");
+    } finally {
+      setLoading(false);
     }
   }
 
   async function revoke(id: string) {
     if (!confirm("Revocare questa API key? Le app che la usano smetteranno di funzionare.")) return;
-    await fetch(`/api/apikeys/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/apikeys/${id}`, { method: "DELETE" });
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error ?? "errore");
     void load();
   }
 

@@ -38,19 +38,24 @@ export default function CampagnePage() {
   async function create() {
     if (!name.trim() || !body.trim()) return;
     setBusy(true);
-    const r = await fetch("/api/campaigns", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), mode: "text", body, tags: [], launchNow: true }),
-    });
-    setBusy(false);
-    if (r.ok) {
-      setOpen(false);
-      setName("");
-      setBody("");
-      void load();
-    } else {
-      alert((await r.json()).error ?? "errore");
+    try {
+      const r = await fetch("/api/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), mode: "text", body, tags: [], launchNow: true }),
+      });
+      if (r.ok) {
+        setOpen(false);
+        setName("");
+        setBody("");
+        void load();
+      } else {
+        alert((await r.json().catch(() => ({}))).error ?? "errore");
+      }
+    } catch {
+      alert("Errore di rete");
+    } finally {
+      setBusy(false);
     }
   }
 
