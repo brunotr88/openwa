@@ -51,9 +51,11 @@ export function SettingsProvider({
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSeq = useRef(0);
 
   const save = useCallback(
     async (patch: Record<string, unknown>): Promise<boolean> => {
+      const seq = ++latestSeq.current;
       // Update ottimistico
       const previous = settings;
       const optimistic = parseTenantSettings(deepMerge(previous, patch));
@@ -69,11 +71,14 @@ export function SettingsProvider({
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json()) as { settings: TenantSettings };
+        // Solo l'ultimo save applica il risultato del server / rollback.
+        if (seq !== latestSeq.current) return true;
         setSettings(parseTenantSettings(data.settings));
         setSaveState("saved");
         savedTimer.current = setTimeout(() => setSaveState("idle"), 2000);
         return true;
       } catch {
+        if (seq !== latestSeq.current) return false;
         setSettings(previous); // rollback
         setSaveState("error");
         savedTimer.current = setTimeout(() => setSaveState("idle"), 4000);

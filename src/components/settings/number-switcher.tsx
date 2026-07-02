@@ -1,10 +1,11 @@
 "use client";
 
 /**
- * Selettore del numero da configurare — naviga a ?sessionId=<id> preservando
- * il pathname corrente. Le impostazioni sono per-numero (M5).
+ * Selettore del numero da configurare — persiste la scelta in un cookie
+ * (leggibile dal layout server) e ricarica i server component. Le
+ * impostazioni sono per-numero (M5).
  */
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export function NumberSwitcher({
   numbers,
@@ -14,11 +15,13 @@ export function NumberSwitcher({
   current: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   return (
     <select
       value={current}
-      onChange={(e) => router.push(`${pathname}?sessionId=${e.target.value}`)}
+      onChange={(e) => {
+        document.cookie = `owa_settings_session=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
+        router.refresh();
+      }}
       className="mb-3 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm shadow-sm"
       aria-label="Numero da configurare"
     >

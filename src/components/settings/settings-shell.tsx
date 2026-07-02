@@ -91,7 +91,7 @@ export function SettingsShell({
   const [playgroundOpen, setPlaygroundOpen] = useState(false);
 
   return (
-    <SettingsProvider tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
+    <SettingsProvider key={sessionId} tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
       {/* Mobile: title + chip row */}
       <div className="mb-4 md:hidden">
         <div className="mb-3 flex items-center justify-between gap-3">

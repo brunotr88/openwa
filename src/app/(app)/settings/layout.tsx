@@ -4,6 +4,7 @@
  * la parte interattiva è delegata alla SettingsShell (client).
  */
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getActor, resolveTenantId } from "@/lib/authz";
 import { getSessionSettings } from "@/lib/settings/session";
 import { pickPrimarySession } from "@/lib/sessions/primary";
@@ -14,10 +15,8 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsLayout({
   children,
-  searchParams,
 }: {
   children: React.ReactNode;
-  searchParams: Promise<{ sessionId?: string }>;
 }) {
   const actor = await getActor();
   if (!actor) redirect("/login");
@@ -42,9 +41,10 @@ export default async function SettingsLayout({
       </div>
     );
   }
-  const requested = (await searchParams).sessionId;
+  const cookieStore = await cookies();
+  const selected = cookieStore.get("owa_settings_session")?.value;
   const sessionId =
-    (requested && numbers.some((n) => n.id === requested) && requested) ||
+    (selected && numbers.some((n) => n.id === selected) && selected) ||
     pickPrimarySession(numbers)!;
   const settings = await getSessionSettings(sessionId);
 
