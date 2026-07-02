@@ -60,6 +60,7 @@ function fmtDelay(minMs: number, maxMs: number): string {
 // ── Step 1: Connetti WhatsApp ────────────────────────────────────────────────
 
 function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) {
+  const router = useRouter();
   const [connected, setConnected] = useState(hasConnectedSession);
   const [label, setLabel] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -129,7 +130,15 @@ function ConnectStep({ hasConnectedSession }: { hasConnectedSession: boolean }) 
           </button>
         </form>
       ) : (
-        <QrPanel sessionId={sessionId} onConnected={() => setConnected(true)} />
+        <QrPanel
+          sessionId={sessionId}
+          onConnected={() => {
+            setConnected(true);
+            // Ricarica setup/page.tsx: pickPrimarySession sceglie la sessione
+            // appena collegata (CONNECTED) e il provider si ri-monta con quella.
+            router.refresh();
+          }}
+        />
       )}
       {error && <p className="text-sm text-danger">{error}</p>}
     </div>
@@ -508,7 +517,7 @@ export function SetupClient({
   hasConnectedSession: boolean;
 }) {
   return (
-    <SettingsProvider tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
+    <SettingsProvider key={sessionId} tenantId={tenantId} sessionId={sessionId} initialSettings={initialSettings}>
       <Wizard hasConnectedSession={hasConnectedSession} />
     </SettingsProvider>
   );
