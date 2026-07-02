@@ -18,7 +18,7 @@ import {
   buildAppointmentTools,
 } from "@/lib/appointments/tools";
 import {
-  parseTenantSettings,
+  tenantSettingsSchema,
   deepMerge,
   buildSystemPrompt,
   styleTemperature,
@@ -70,22 +70,36 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  let sessionId = parsed.data.sessionId ?? null;
-  if (!sessionId) {
-    const sessions = await db.waSession.findMany({
-      where: { tenantId, deletedAt: null },
-      select: { id: true, status: true, createdAt: true },
-    });
-    sessionId = pickPrimarySession(sessions);
-  }
+  // Il sessionId richiesto è accettato SOLO se appartiene al tenant risolto
+  // (no IDOR cross-tenant); altrimenti si ricade sul numero primario.
+  const sessions = await db.waSession.findMany({
+    where: { tenantId, deletedAt: null },
+    select: { id: true, status: true, createdAt: true },
+  });
+  const requested = parsed.data.sessionId;
+  const sessionId =
+    (requested && sessions.some((s) => s.id === requested) && requested) ||
+    pickPrimarySession(sessions);
   if (!sessionId) {
     return Response.json({ error: "no number available" }, { status: 409 });
   }
 
   const saved = await getSessionSettings(sessionId);
-  const settings = parsed.data.draftSettings
-    ? parseTenantSettings(deepMerge(saved, parsed.data.draftSettings))
-    : saved;
+  let settings = saved;
+  if (parsed.data.draftSettings) {
+    // Valida il RISULTATO del merge: se il draft è invalido si segnala l'errore
+    // invece di ricadere silenziosamente sui default (l'utente saprebbe).
+    const merged = tenantSettingsSchema.safeParse(
+      deepMerge(saved, parsed.data.draftSettings)
+    );
+    if (!merged.success) {
+      return Response.json(
+        { error: "invalid draftSettings", issues: merged.error.issues },
+        { status: 400 }
+      );
+    }
+    settings = merged.data;
+  }
 
   // Ultimo messaggio deve essere dell'utente.
   const messages = parsed.data.messages;
