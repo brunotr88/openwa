@@ -189,6 +189,39 @@ export function buildAppointmentTools(opts: AppointmentToolsOptions): {
       }
 
       const end = new Date(start.getTime() + appt.slotDurationMin * 60_000);
+
+      // Ri-valida lo slot PRIMA di creare l'evento: un datetime iniettato via
+      // prompt (passato/notturno/lontano/già occupato) non deve mai finire sul
+      // calendario. Si usano gli stessi vincoli di check_availability.
+      const window = clampBookingWindow({
+        now: now(),
+        minNoticeHours: appt.minNoticeHours,
+        maxDaysAhead: appt.maxDaysAhead,
+      });
+      if (!window || start < window.start || end > window.end) {
+        return {
+          ok: false,
+          booked: false,
+          error: `Lo slot richiesto non è prenotabile: serve un preavviso di almeno ${appt.minNoticeHours} ore e si può prenotare al massimo ${appt.maxDaysAhead} giorni in anticipo. Usa check_availability e proponi un orario valido.`,
+        };
+      }
+      const free = await calendar.listFreeSlots({
+        from: start,
+        to: end,
+        durationMin: appt.slotDurationMin,
+        bufferMin: appt.bufferMin,
+        workingHours: settings.hours,
+        maxSlots: MAX_TOOL_SLOTS,
+      });
+      if (!free.some((s) => s.start.getTime() === start.getTime())) {
+        return {
+          ok: false,
+          booked: false,
+          error:
+            "Lo slot richiesto non è (più) disponibile o è fuori dagli orari di attività: usa check_availability per proporre un orario libero e riprova.",
+        };
+      }
+
       const title = service ? `WhatsApp: ${name} — ${service}` : `WhatsApp: ${name}`;
 
       const result = await calendar.createAppointment({
