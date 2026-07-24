@@ -237,20 +237,23 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "invalid payload" }, { status: 400 });
   }
 
-  // Idempotenza: un retry del gateway (stessa delivery) non deve rieseguire il
-  // handler → niente doppio Message IN né doppia risposta AI. Chiave stabile su
-  // idempotencyKey/deliveryId, fallback all'hash del raw body (già usato per HMAC).
+  // --- Idempotenza: check-prima, marca-solo-dopo-successo ---
+  // INVARIANTE: la riga WebhookDelivery si scrive SOLO dopo che l'evento è stato
+  // processato con successo. Spostare la create prima del handler = regressione
+  // che perde messaggi (un retry del gateway verrebbe scartato come "duplicato").
+  const explicitKey = envelope.idempotencyKey || envelope.deliveryId || null;
+  // Fallback all'hash del rawBody SOLO per message.received (il body contiene l'id
+  // del messaggio WA → payload identico ⇒ stesso messaggio). Mai per session.*:
+  // gli heartbeat identici sono delivery diverse e l'handler di stato è idempotente.
   const dedupeKey =
-    envelope.idempotencyKey ||
-    envelope.deliveryId ||
-    createHash("sha256").update(rawBody).digest("hex");
-  try {
-    await db.webhookDelivery.create({ data: { key: dedupeKey } });
-  } catch (e) {
-    if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
-      return Response.json({ ok: true, deduped: true });
-    }
-    throw e;
+    explicitKey ??
+    (envelope.event === "message.received"
+      ? createHash("sha256").update(rawBody).digest("hex")
+      : null);
+
+  if (dedupeKey) {
+    const seen = await db.webhookDelivery.findUnique({ where: { key: dedupeKey } });
+    if (seen) return Response.json({ ok: true, deduped: true });
   }
 
   try {
@@ -267,11 +270,22 @@ export async function POST(req: Request): Promise<Response> {
         break; // ignore unhandled events (test, message.ack, ...)
     }
   } catch (e) {
-    // Con l'idempotenza (B1) i retry sono sicuri: su errori inattesi rispondi 500
-    // così il gateway riprova invece di perdere per sempre l'inbound.
     console.error(`[webhook/wa] handler error for ${envelope.event}:`, e);
+    // NIENTE dedup scritto → il retry del gateway ri-processa davvero.
     return Response.json({ error: "internal error" }, { status: 500 });
   }
 
+  // Marca la delivery SOLO dopo processing riuscito. Best-effort, non-fatale:
+  // un P2002 (retry concorrente) o un errore DB non deve trasformare un successo
+  // in 500 (che causerebbe un ri-processing inutile).
+  if (dedupeKey) {
+    try {
+      await db.webhookDelivery.create({ data: { key: dedupeKey } });
+    } catch (e) {
+      if (!(e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002")) {
+        console.error("[webhook/wa] dedup mark failed (non-fatal):", e);
+      }
+    }
+  }
   return Response.json({ ok: true });
 }

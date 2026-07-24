@@ -10,7 +10,7 @@ const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
     tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     message: { create: vi.fn() },
-    webhookDelivery: { create: vi.fn() },
+    webhookDelivery: { create: vi.fn(), findUnique: vi.fn() },
   },
   mockGenerateReply: vi.fn(),
 }));
@@ -100,6 +100,7 @@ beforeEach(() => {
   mockDb.conversation.update.mockResolvedValue({});
   mockDb.message.create.mockResolvedValue({ id: "m1" });
   mockDb.webhookDelivery.create.mockResolvedValue({});
+  mockDb.webhookDelivery.findUnique.mockResolvedValue(null);
   mockGenerateReply.mockResolvedValue("m2");
 });
 
@@ -273,5 +274,76 @@ describe("POST /api/webhooks/wa — session.status", () => {
     const res = await POST(makeRequest(statusEnvelope("initializing")));
     expect(res.status).toBe(200);
     expect(mockDb.waSession.update).not.toHaveBeenCalled();
+  });
+});
+
+// ── Idempotenza: check-prima / marca-solo-dopo-successo ────────────────────────
+//
+// Regression coverage per l'incidente: la dedup-row NON deve mai essere scritta
+// prima che l'evento sia processato con successo, altrimenti un retry del
+// gateway dopo un fallimento verrebbe scartato come "duplicato" e il messaggio
+// andrebbe perso per sempre.
+
+describe("POST /api/webhooks/wa — idempotenza (check-prima/marca-dopo-successo)", () => {
+  it("un handler fallito NON scrive la dedup-row → il retry successivo riprocessa davvero", async () => {
+    // In-memory store per simulare l'unicità di WebhookDelivery.key.
+    const store = new Set<string>();
+    mockDb.webhookDelivery.findUnique.mockImplementation(async ({ where }: { where: { key: string } }) =>
+      store.has(where.key) ? { key: where.key } : null
+    );
+    mockDb.webhookDelivery.create.mockImplementation(async ({ data }: { data: { key: string } }) => {
+      if (store.has(data.key)) {
+        const err = new Error("Unique constraint failed") as Error & { code?: string };
+        err.code = "P2002";
+        throw err;
+      }
+      store.add(data.key);
+      return { key: data.key };
+    });
+
+    // Primo tentativo: il DB fallisce dentro l'handler (message.create esplode).
+    mockDb.message.create.mockRejectedValueOnce(new Error("db down"));
+
+    const envelope = messageReceivedEnvelope();
+    const res1 = await POST(makeRequest(envelope));
+    expect(res1.status).toBe(500);
+    // Nessuna riga di dedup scritta dopo il fallimento.
+    expect(mockDb.webhookDelivery.create).not.toHaveBeenCalled();
+    expect(store.size).toBe(0);
+
+    // Retry del gateway con lo STESSO payload: il processing ora va a buon fine.
+    mockDb.message.create.mockResolvedValueOnce({ id: "m1" });
+    const res2 = await POST(makeRequest(envelope));
+    expect(res2.status).toBe(200);
+    const body2 = (await res2.json()) as { ok?: boolean; deduped?: boolean };
+    expect(body2.deduped).not.toBe(true);
+    // Il messaggio è stato davvero salvato al retry, non scartato come duplicato.
+    expect(mockDb.message.create).toHaveBeenCalledTimes(2);
+    // E ora la dedup-row è stata marcata (best-effort, dopo successo).
+    expect(store.has("msg_abc")).toBe(true);
+  });
+
+  it("stessa delivery processata con successo due volte → la seconda è deduped e l'handler non rigira", async () => {
+    const store = new Set<string>();
+    mockDb.webhookDelivery.findUnique.mockImplementation(async ({ where }: { where: { key: string } }) =>
+      store.has(where.key) ? { key: where.key } : null
+    );
+    mockDb.webhookDelivery.create.mockImplementation(async ({ data }: { data: { key: string } }) => {
+      store.add(data.key);
+      return { key: data.key };
+    });
+
+    const envelope = messageReceivedEnvelope();
+
+    const res1 = await POST(makeRequest(envelope));
+    expect(res1.status).toBe(200);
+    expect(mockDb.message.create).toHaveBeenCalledTimes(1);
+
+    const res2 = await POST(makeRequest(envelope));
+    expect(res2.status).toBe(200);
+    const body2 = (await res2.json()) as { ok?: boolean; deduped?: boolean };
+    expect(body2.deduped).toBe(true);
+    // Handler NON rieseguito sulla delivery duplicata.
+    expect(mockDb.message.create).toHaveBeenCalledTimes(1);
   });
 });

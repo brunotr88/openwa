@@ -10,7 +10,7 @@ const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
     tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     message: { create: vi.fn() },
-    webhookDelivery: { create: vi.fn() },
+    webhookDelivery: { create: vi.fn(), findUnique: vi.fn() },
   },
   mockGenerateReply: vi.fn(),
 }));
@@ -87,6 +87,7 @@ beforeEach(() => {
   mockDb.conversation.update.mockResolvedValue({});
   mockDb.message.create.mockResolvedValue({ id: "m1" });
   mockDb.webhookDelivery.create.mockResolvedValue({});
+  mockDb.webhookDelivery.findUnique.mockResolvedValue(null);
   mockGenerateReply.mockResolvedValue("m2");
 });
 
