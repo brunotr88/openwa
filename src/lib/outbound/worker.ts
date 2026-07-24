@@ -40,44 +40,68 @@ export interface DrainSummary {
 export async function drainOutbound(now: Date = new Date()): Promise<DrainSummary> {
   const summary: DrainSummary = { processed: 0, sent: 0, failed: 0, skipped: 0 };
 
-  // Purge best-effort delle WebhookDelivery vecchie (dedup idempotenza webhook):
-  // oltre 7gg non serve più per il dedup, e senza questo la tabella cresce
-  // illimitatamente. Best-effort: un fallimento qui non deve bloccare il drain.
-  await db.webhookDelivery
-    .deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 7 * 24 * 3600_000) } } })
-    .catch(() => {});
+  // FIX B: il cron gira ogni minuto ma un drain può durare più a lungo; senza
+  // questo lock due drain concorrenti leggerebbero gli stessi contatori di
+  // pacing (sentToday/sentThisHour) prima che l'altro scriva, sforando i cap
+  // anti-ban. Un secondo drain concorrente esce subito senza fare nulla.
+  const [{ locked }] = await db.$queryRaw<{ locked: boolean }[]>`
+    SELECT pg_try_advisory_lock(hashtext('openwa_outbound_drain')) AS locked
+  `;
+  if (!locked) return summary;
 
-  // Recupero job orfani: un SENDING bloccato da troppo (processo morto tra il
-  // lock e la scrittura del Message) NON viene re-inviato — rischio duplicato —
-  // ma marcato FAILED; l'app/campagna lo vede e può ripianificarlo.
-  await db.outboundJob.updateMany({
-    where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
-    data: { status: "FAILED", lastError: "stuck_in_sending" },
-  });
+  try {
+    // Purge best-effort delle WebhookDelivery vecchie (dedup idempotenza webhook):
+    // oltre 7gg non serve più per il dedup, e senza questo la tabella cresce
+    // illimitatamente. Best-effort: un fallimento qui non deve bloccare il drain.
+    await db.webhookDelivery
+      .deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 7 * 24 * 3600_000) } } })
+      .catch(() => {});
 
-  const dueJobs = await db.outboundJob.findMany({
-    where: {
-      status: "PENDING",
-      OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
-    },
-    orderBy: { createdAt: "asc" },
-    select: { id: true, sessionId: true },
-  });
-  const bySession = new Map<string, string[]>();
-  for (const j of dueJobs) {
-    const arr = bySession.get(j.sessionId) ?? [];
-    if (arr.length < MAX_PER_SESSION_PER_TICK) arr.push(j.id);
-    bySession.set(j.sessionId, arr);
-  }
+    // Recupero job orfani: un SENDING bloccato da troppo (processo morto tra il
+    // lock e la scrittura del Message) NON viene re-inviato — rischio duplicato —
+    // ma marcato FAILED; l'app/campagna lo vede e può ripianificarlo.
+    await db.outboundJob.updateMany({
+      where: { status: "SENDING", updatedAt: { lt: new Date(now.getTime() - STALE_SENDING_MS) } },
+      data: { status: "FAILED", lastError: "stuck_in_sending" },
+    });
 
-  for (const [, jobIds] of bySession) {
-    for (const jobId of jobIds) {
-      summary.processed++;
-      const res = await sendOneJob(jobId, now);
-      summary[res]++;
+    // FIX C: cap esplicito. Al più 1 job/sessione/tick viene comunque preso,
+    // ma senza LIMIT la query dei PENDING dovuti scansiona l'intera coda; 500
+    // copre ampiamente il numero di sessioni distinte in un singolo tenant/tick.
+    const dueJobs = await db.outboundJob.findMany({
+      where: {
+        status: "PENDING",
+        OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, sessionId: true },
+      take: 500,
+    });
+    const bySession = new Map<string, string[]>();
+    for (const j of dueJobs) {
+      const arr = bySession.get(j.sessionId) ?? [];
+      if (arr.length < MAX_PER_SESSION_PER_TICK) arr.push(j.id);
+      bySession.set(j.sessionId, arr);
     }
+
+    for (const [, jobIds] of bySession) {
+      for (const jobId of jobIds) {
+        summary.processed++;
+        // FIX A: un job che lancia non deve abortire l'intero drain (altrimenti
+        // il job resta lockato in SENDING e i job successivi non vengono processati).
+        try {
+          const res = await sendOneJob(jobId, now);
+          summary[res]++;
+        } catch (e) {
+          console.error("[outbound] sendOneJob threw, continuing drain:", jobId, e);
+          summary.failed++;
+        }
+      }
+    }
+    return summary;
+  } finally {
+    await db.$executeRaw`SELECT pg_advisory_unlock(hashtext('openwa_outbound_drain'))`;
   }
-  return summary;
 }
 
 type JobOutcome = "sent" | "failed" | "skipped";

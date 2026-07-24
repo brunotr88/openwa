@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { auditLog } from "@/lib/audit";
 import { getActor, resolveTenantId } from "@/lib/authz";
 import { pickSession } from "@/lib/outbound/enqueue";
 import { launchCampaign, campaignStats } from "@/lib/outbound/campaign";
@@ -68,24 +69,54 @@ export async function POST(req: Request): Promise<Response> {
     });
     if (!tpl) return Response.json({ error: "template non valido" }, { status: 400 });
   }
-  const campaign = await db.campaign.create({
-    data: {
-      tenantId,
-      sessionId: session.id,
-      name: b.name,
-      mode: b.mode === "template" ? "TEMPLATE" : "TEXT",
-      body: b.body ?? null,
-      templateId: b.templateId ?? null,
-      defaultVars: { ...(b.defaultVars ?? {}), tags: b.tags },
-      scheduledAt: b.scheduledAt ? new Date(b.scheduledAt) : null,
-      status: "DRAFT",
-    },
-    select: { id: true },
+  // FIX D: idempotenza — nome campagna univoco per tenant (tra le non cancellate),
+  // vincolato dall'indice unico parziale Campaign_tenantId_name_active. Un
+  // doppio submit con lo stesso nome torna 409 invece di creare un duplicato.
+  let campaign: { id: string };
+  try {
+    campaign = await db.campaign.create({
+      data: {
+        tenantId,
+        sessionId: session.id,
+        name: b.name,
+        mode: b.mode === "template" ? "TEMPLATE" : "TEXT",
+        body: b.body ?? null,
+        templateId: b.templateId ?? null,
+        defaultVars: { ...(b.defaultVars ?? {}), tags: b.tags },
+        scheduledAt: b.scheduledAt ? new Date(b.scheduledAt) : null,
+        status: "DRAFT",
+      },
+      select: { id: true },
+    });
+  } catch (e) {
+    // 409 SOLO su violazione di unicità (nome duplicato); altri errori → 500.
+    if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+      return Response.json({ error: "nome campagna già esistente" }, { status: 409 });
+    }
+    throw e;
+  }
+  await auditLog({
+    userId: actor.userId,
+    tenantId,
+    action: "campaign.create",
+    entity: "Campaign",
+    entityId: campaign.id,
+    meta: { name: b.name, mode: b.mode },
   });
 
   if (b.launchNow) {
-    const res = await launchCampaign(campaign.id);
-    return Response.json({ id: campaign.id, ...res }, { status: 201 });
+    // FIX E: la campagna è già stata creata (e committata) sopra: se il lancio
+    // esplode NON dobbiamo propagare un 500, altrimenti l'utente ritenta il
+    // POST e crea (o prova a creare, ora bloccato da FIX D) un duplicato.
+    // La campagna resta DRAFT/RUNNING a seconda di dove è fallito launchCampaign
+    // e può essere ri-lanciata (vedi FIX F) senza duplicare gli invii.
+    try {
+      const res = await launchCampaign(campaign.id);
+      return Response.json({ id: campaign.id, ...res }, { status: 201 });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return Response.json({ id: campaign.id, enqueued: 0, launchError: message }, { status: 201 });
+    }
   }
   return Response.json({ id: campaign.id, enqueued: 0 }, { status: 201 });
 }

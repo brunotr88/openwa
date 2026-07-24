@@ -35,16 +35,28 @@ async function eligibleContacts(tenantId: string, tags: string[]): Promise<{ id:
     },
     select: { id: true, name: true, optInStatus: true },
   });
+
+  const notIn = contacts.filter((c) => c.optInStatus !== "IN");
+  // FIX G: prima era 1 query `message.count` per contatto non-IN (N+1). Un solo
+  // giro: prendiamo i contactId con almeno un Message IN tra i candidati e
+  // filtriamo in memoria — stessa logica di eleggibilità, una query sola.
+  const hasInboundIds = new Set<string>();
+  if (notIn.length > 0) {
+    const withInbound = await db.message.findMany({
+      where: {
+        direction: "IN",
+        conversation: { contactId: { in: notIn.map((c) => c.id) } },
+      },
+      select: { conversation: { select: { contactId: true } } },
+    });
+    for (const m of withInbound) hasInboundIds.add(m.conversation.contactId);
+  }
+
   const result: { id: string; name: string | null }[] = [];
   for (const c of contacts) {
-    if (c.optInStatus === "IN") {
+    if (c.optInStatus === "IN" || hasInboundIds.has(c.id)) {
       result.push({ id: c.id, name: c.name });
-      continue;
     }
-    const inbound = await db.message.count({
-      where: { conversation: { contactId: c.id }, direction: "IN" },
-    });
-    if (inbound > 0) result.push({ id: c.id, name: c.name });
   }
   return result;
 }
@@ -53,13 +65,17 @@ export async function launchCampaign(campaignId: string): Promise<LaunchResult> 
   const campaign = await db.campaign.findUnique({ where: { id: campaignId } });
   if (!campaign) throw new Error("campaign not found");
 
-  // C5: CLAIM atomico — una campagna viene lanciata una sola volta anche con
-  // doppio click / retry. Solo chi passa DRAFT→RUNNING procede a mettere in coda.
+  // C5/FIX F: CLAIM atomico DRAFT→RUNNING per il primo lancio. Un ri-lancio
+  // (retry dopo un enqueue parziale fallito, o un tick del worker che non
+  // aveva ancora marcato COMPLETED) è ammesso anche a partire da RUNNING:
+  // l'enqueue sotto è reso idempotente (P2002 su campaignId+contactId → skip),
+  // quindi ri-lanciare una campagna RUNNING completa solo i contatti mancanti
+  // senza duplicare gli invii già accodati.
   const claimed = await db.campaign.updateMany({
-    where: { id: campaignId, status: "DRAFT" },
+    where: { id: campaignId, status: { in: ["DRAFT", "RUNNING"] } },
     data: { status: "RUNNING" },
   });
-  if (claimed.count === 0) throw new Error("campaign not in DRAFT");
+  if (claimed.count === 0) throw new Error("campaign not launchable (status terminale)");
 
   const tags = Array.isArray((campaign.defaultVars as { tags?: string[] } | null)?.tags)
     ? ((campaign.defaultVars as { tags?: string[] }).tags as string[])
@@ -67,6 +83,7 @@ export async function launchCampaign(campaignId: string): Promise<LaunchResult> 
   const recipients = await eligibleContacts(campaign.tenantId, tags);
 
   let enqueued = 0;
+  let skipped = 0;
   for (const c of recipients) {
     const conversationId = await ensureConversation(campaign.tenantId, c.id, campaign.sessionId);
     const payload: OutboundPayload =
@@ -80,33 +97,44 @@ export async function launchCampaign(campaignId: string): Promise<LaunchResult> 
           }
         : { mode: "TEXT", text: campaign.body ?? "" };
 
-    await enqueueOutbound({
-      tenantId: campaign.tenantId,
-      sessionId: campaign.sessionId,
-      contactId: c.id,
-      conversationId,
-      mode: campaign.mode === "TEMPLATE" ? "TEMPLATE" : "TEXT",
-      payload,
-      source: "CAMPAIGN",
-      campaignId: campaign.id,
-      scheduledAt: campaign.scheduledAt ?? null,
-    });
-    enqueued++;
+    try {
+      await enqueueOutbound({
+        tenantId: campaign.tenantId,
+        sessionId: campaign.sessionId,
+        contactId: c.id,
+        conversationId,
+        mode: campaign.mode === "TEMPLATE" ? "TEMPLATE" : "TEXT",
+        payload,
+        source: "CAMPAIGN",
+        campaignId: campaign.id,
+        scheduledAt: campaign.scheduledAt ?? null,
+      });
+      enqueued++;
+    } catch (e) {
+      // FIX F: P2002 sull'unique (campaignId, contactId) = contatto già
+      // accodato da un lancio precedente → non è un errore, si salta.
+      if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+        skipped++;
+        continue;
+      }
+      throw e;
+    }
   }
 
-  // Lo status è già RUNNING dal claim atomico; qui aggiorniamo solo il conteggio.
+  // Lo status è già RUNNING dal claim atomico; qui aggiorniamo solo il conteggio
+  // (su un ri-lancio, riflette il totale eleggibili corrente, non solo i nuovi).
   await db.campaign.update({
     where: { id: campaign.id },
-    data: { totalRecipients: enqueued },
+    data: { totalRecipients: enqueued + skipped },
   });
   await auditLog({
     tenantId: campaign.tenantId,
     action: "campaign.launch",
     entity: "Campaign",
     entityId: campaign.id,
-    meta: { enqueued, tags },
+    meta: { enqueued, skipped, tags },
   });
-  return { enqueued, skipped: 0 };
+  return { enqueued, skipped };
 }
 
 export interface CampaignStats {
@@ -126,5 +154,19 @@ export async function campaignStats(campaignId: string): Promise<CampaignStats> 
   const sent = get("DONE");
   const failed = get("FAILED") + get("CANCELED");
   const pending = get("PENDING") + get("SENDING");
-  return { total: sent + failed + pending, pending, sent, failed };
+  const total = sent + failed + pending;
+
+  // FIX H: aggiornamento pigro — campaignStats è chiamata sia dalla lista sia
+  // dal dettaglio campagne, quindi è il punto più semplice per accorgersi che
+  // tutti i job sono in stato terminale e chiudere la campagna. `updateMany`
+  // con `where: { status: "RUNNING" }` è idempotente (no-op se già DONE/altro)
+  // e non richiede una query extra per leggere lo stato corrente.
+  if (total > 0 && pending === 0) {
+    await db.campaign.updateMany({
+      where: { id: campaignId, status: "RUNNING" },
+      data: { status: "DONE" },
+    });
+  }
+
+  return { total, pending, sent, failed };
 }

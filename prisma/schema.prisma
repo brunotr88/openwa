@@ -392,6 +392,11 @@ model OutboundJob {
   conversation Conversation? @relation(fields: [conversationId], references: [id])
   campaign     Campaign?     @relation(fields: [campaignId], references: [id])
 
+  // FIX F: idempotenza dell'enqueue di campagna — un contatto non può essere
+  // accodato due volte per la stessa campagna (ri-lanci sicuri). I job non di
+  // campagna hanno campaignId NULL: in Postgres i NULL multipli non violano
+  // un indice unico, quindi l'enqueue via API (campaignId assente) non è vincolato.
+  @@unique([campaignId, contactId])
   @@index([status, scheduledAt])
   @@index([tenantId])
   @@index([sessionId, status])
