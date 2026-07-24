@@ -80,23 +80,44 @@ export async function resolveSendableContact(
   return { id: contact.id, optedIn };
 }
 
-/** Conversazione aperta esistente per (contatto, sessione) o nuova. */
+/**
+ * Conversazione OPEN esistente per (contatto, sessione), o nuova OPEN.
+ * FIX 3: allineato al webhook, che riusa/crea solo conversazioni OPEN — un
+ * findFirst senza filtro status riaprirebbe/riuserebbe anche CLOSED/SNOOZED,
+ * scaricando messaggi outbound in conversazioni che l'operatore ha chiuso.
+ * Scelta più semplice: cerchiamo solo tra le OPEN; se non c'è, ne creiamo una
+ * nuova (non riapriamo una CLOSED/SNOOZED esistente, per non "resuscitare"
+ * silenziosamente una conversazione che un operatore ha volutamente chiuso).
+ */
 export async function ensureConversation(
   tenantId: string,
   contactId: string,
   sessionId: string
 ): Promise<string> {
   const existing = await db.conversation.findFirst({
-    where: { tenantId, contactId, sessionId, deletedAt: null },
+    where: { tenantId, contactId, sessionId, status: "OPEN", deletedAt: null },
     orderBy: { lastMessageAt: "desc" },
     select: { id: true },
   });
   if (existing) return existing.id;
-  const created = await db.conversation.create({
-    data: { tenantId, contactId, sessionId, mode: "MANUAL", status: "OPEN" },
-    select: { id: true },
-  });
-  return created.id;
+  try {
+    const created = await db.conversation.create({
+      data: { tenantId, contactId, sessionId, mode: "MANUAL", status: "OPEN" },
+      select: { id: true },
+    });
+    return created.id;
+  } catch (e) {
+    // P2002 = indice unico parziale Conversation_open_uniq: un'altra delivery
+    // concorrente (webhook o altro enqueue) ha già creato la OPEN → riusala.
+    if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+      const found = await db.conversation.findFirst({
+        where: { tenantId, contactId, sessionId, status: "OPEN", deletedAt: null },
+        select: { id: true },
+      });
+      if (found) return found.id;
+    }
+    throw e;
+  }
 }
 
 export interface EnqueueParams {

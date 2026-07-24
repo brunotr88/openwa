@@ -155,15 +155,34 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     },
   });
   if (!conversation) {
-    conversation = await db.conversation.create({
-      data: {
-        tenantId: session.tenantId,
-        contactId: contact.id,
-        sessionId: session.id,
-        mode: defaultMode,
-        status: "OPEN",
-      },
-    });
+    try {
+      conversation = await db.conversation.create({
+        data: {
+          tenantId: session.tenantId,
+          contactId: contact.id,
+          sessionId: session.id,
+          mode: defaultMode,
+          status: "OPEN",
+        },
+      });
+    } catch (e) {
+      // P2002 = violazione dell'indice unico parziale Conversation_open_uniq:
+      // un'altra delivery concorrente ha già creato la OPEN → riusala.
+      if (e && typeof e === "object" && "code" in e && (e as { code?: string }).code === "P2002") {
+        conversation = await db.conversation.findFirst({
+          where: {
+            tenantId: session.tenantId,
+            contactId: contact.id,
+            sessionId: session.id,
+            status: "OPEN",
+            deletedAt: null,
+          },
+        });
+        if (!conversation) throw e;
+      } else {
+        throw e;
+      }
+    }
   }
 
   await db.message.create({

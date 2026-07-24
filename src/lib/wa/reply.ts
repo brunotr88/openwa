@@ -153,6 +153,49 @@ export async function generateAndDeliverReply(
   if (!conversation) return null;
   if (conversation.mode === "MANUAL") return null;
 
+  // ── Claim atomico anti-race (FIX 2) ───────────────────────────────────────
+  // 2 messaggi ravvicinati possono avviare 2 run paralleli di questa funzione
+  // per la stessa conversazione, entrambi vedendo l'ultimo messaggio come
+  // 'user' → doppia risposta. Serializziamo con una colonna claim (replyingAt)
+  // invece di un advisory lock raw (mockabile nei test). Un claim scaduto
+  // (>2 min, processo morto) può essere ripreso da un run successivo.
+  const claimNow = new Date();
+  const claim = await db.conversation.updateMany({
+    where: {
+      id: conversationId,
+      OR: [
+        { replyingAt: null },
+        { replyingAt: { lt: new Date(claimNow.getTime() - 2 * 60_000) } },
+      ],
+    },
+    data: { replyingAt: claimNow },
+  });
+  if (claim.count === 0) return null; // un'altra reply è già in corso
+
+  try {
+    return await generateAndDeliverReplyLocked(conversation, conversationId);
+  } finally {
+    await db.conversation
+      .update({ where: { id: conversationId }, data: { replyingAt: null } })
+      .catch(() => {});
+  }
+}
+
+type ConversationWithContactAndSession = NonNullable<
+  Awaited<
+    ReturnType<
+      typeof db.conversation.findUnique<{
+        where: { id: string };
+        include: { contact: true; session: true };
+      }>
+    >
+  >
+>;
+
+async function generateAndDeliverReplyLocked(
+  conversation: ConversationWithContactAndSession,
+  conversationId: string
+): Promise<string | null> {
   const settings = await getSessionSettings(conversation.sessionId);
   if (settings.behavior.aiMode === "OFF") return null;
 
@@ -287,6 +330,25 @@ export async function generateAndDeliverReply(
 
   const text = result.text.trim();
   if (!text) return null;
+
+  // ── FIX 2c: re-check anti-staleness prima di inviare in AUTO ──────────────
+  // Tra l'inizio della generazione (chiamata LLM, potenzialmente lenta) e ora,
+  // può essere arrivato un nuovo messaggio (IN dal contatto, o OUT da un
+  // operatore/altra run). Se l'ultimo messaggio non-DRAFT/FAILED/QUEUED non è
+  // più quello a cui stavamo rispondendo, la risposta generata è ormai stale:
+  // non inviarla (finirà comunque come DRAFT più sotto se autoAllowed).
+  if (autoAllowed) {
+    const latest = await db.message.findFirst({
+      where: {
+        conversationId: conversation.id,
+        status: { notIn: ["DRAFT", "FAILED", "QUEUED"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    const stillCurrent = recent.length === 0 ? latest === null : latest?.id === recent[0].id;
+    if (!stillCurrent) return null;
+  }
 
   if (!autoAllowed) {
     const draft = await db.message.create({

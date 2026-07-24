@@ -4,9 +4,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
-    conversation: { findUnique: vi.fn(), update: vi.fn() },
+    conversation: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     aiConfig: { findUnique: vi.fn() },
-    message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
     tenant: { findUnique: vi.fn(), update: vi.fn() },
     waSession: { findUnique: vi.fn() },
   },
@@ -55,6 +55,7 @@ function conversationFixture(mode: "AUTO" | "COPILOT" | "MANUAL") {
 function historyFixture() {
   return [
     {
+      id: "msg-in-1",
       direction: "IN",
       body: "Avete disponibilità?",
       status: "RECEIVED",
@@ -62,6 +63,7 @@ function historyFixture() {
       createdAt: new Date(),
     },
     {
+      id: "msg-out-0",
       direction: "OUT",
       body: "Buongiorno!",
       status: "SENT",
@@ -115,6 +117,11 @@ beforeEach(() => {
   mockDb.message.create.mockResolvedValue({ id: "out1" });
   mockDb.message.update.mockResolvedValue({});
   mockDb.conversation.update.mockResolvedValue({});
+  // FIX 2: claim atomico ottenuto di default; FIX 2c: il re-check vede lo
+  // stesso ultimo messaggio ('msg-in-1', il più recente in historyFixture) →
+  // non stale, la AUTO-send può procedere come nei test pre-esistenti.
+  mockDb.conversation.updateMany.mockResolvedValue({ count: 1 });
+  mockDb.message.findFirst.mockResolvedValue({ id: "msg-in-1" });
   mockSendText.mockResolvedValue({ messageId: "wamid1", timestamp: 1780000000 });
 });
 
@@ -309,6 +316,43 @@ describe("generateAndDeliverReply — COPILOT", () => {
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: "ai.reply.draft" })
     );
+  });
+});
+
+describe("generateAndDeliverReply — concurrency (FIX 2)", () => {
+  it("returns null when the reply claim is already held (updateMany count 0)", async () => {
+    mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
+    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    mockDb.conversation.updateMany.mockResolvedValue({ count: 0 });
+
+    const id = await generateAndDeliverReply("conv1");
+    expect(id).toBeNull();
+    expect(mockGenerate).not.toHaveBeenCalled();
+    expect(mockDb.message.create).not.toHaveBeenCalled();
+  });
+
+  it("releases the claim (replyingAt=null) after a successful AUTO send", async () => {
+    mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
+    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+
+    await generateAndDeliverReply("conv1");
+    expect(mockDb.conversation.update).toHaveBeenCalledWith({
+      where: { id: "conv1" },
+      data: { replyingAt: null },
+    });
+  });
+
+  it("does not send when a newer message arrived during generation (stale re-check)", async () => {
+    mockDb.conversation.findUnique.mockResolvedValue(conversationFixture("AUTO"));
+    mockDb.aiConfig.findUnique.mockResolvedValue(aiConfigFixture());
+    // Un nuovo messaggio (diverso da quello a cui stavamo rispondendo) è
+    // arrivato mentre l'LLM generava la risposta.
+    mockDb.message.findFirst.mockResolvedValue({ id: "msg-in-2-newer" });
+
+    const id = await generateAndDeliverReply("conv1");
+    expect(id).toBeNull();
+    expect(mockSendText).not.toHaveBeenCalled();
+    expect(mockDb.message.create).not.toHaveBeenCalled();
   });
 });
 

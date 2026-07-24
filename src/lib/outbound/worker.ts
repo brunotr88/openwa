@@ -40,6 +40,13 @@ export interface DrainSummary {
 export async function drainOutbound(now: Date = new Date()): Promise<DrainSummary> {
   const summary: DrainSummary = { processed: 0, sent: 0, failed: 0, skipped: 0 };
 
+  // Purge best-effort delle WebhookDelivery vecchie (dedup idempotenza webhook):
+  // oltre 7gg non serve più per il dedup, e senza questo la tabella cresce
+  // illimitatamente. Best-effort: un fallimento qui non deve bloccare il drain.
+  await db.webhookDelivery
+    .deleteMany({ where: { createdAt: { lt: new Date(now.getTime() - 7 * 24 * 3600_000) } } })
+    .catch(() => {});
+
   // Recupero job orfani: un SENDING bloccato da troppo (processo morto tra il
   // lock e la scrittura del Message) NON viene re-inviato — rischio duplicato —
   // ma marcato FAILED; l'app/campagna lo vede e può ripianificarlo.

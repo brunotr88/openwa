@@ -4,9 +4,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockDb, mockSendText, mockGenerate, mockAuditLog } = vi.hoisted(() => ({
   mockDb: {
-    conversation: { findUnique: vi.fn(), update: vi.fn() },
+    conversation: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     aiConfig: { findUnique: vi.fn() },
-    message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), count: vi.fn() },
+    message: { create: vi.fn(), update: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
     tenant: { findUnique: vi.fn(), update: vi.fn() },
     waSession: { findUnique: vi.fn() },
   },
@@ -47,8 +47,11 @@ const conversation = {
   session: { id: "wa1", sessionDataRef: "gw-uuid" },
 };
 
+let nextMsgId = 0;
+
 function inbound(body: string) {
   return {
+    id: `msg-${nextMsgId++}`,
     direction: "IN",
     body,
     status: "RECEIVED",
@@ -59,6 +62,7 @@ function inbound(body: string) {
 
 function aiOutbound(body = "Risposta AI") {
   return {
+    id: `msg-${nextMsgId++}`,
     direction: "OUT",
     body,
     status: "SENT",
@@ -69,6 +73,7 @@ function aiOutbound(body = "Risposta AI") {
 
 function humanOutbound(body = "Risposta umana") {
   return {
+    id: `msg-${nextMsgId++}`,
     direction: "OUT",
     body,
     status: "SENT",
@@ -109,6 +114,14 @@ beforeEach(() => {
   mockDb.message.count.mockResolvedValue(0);
   mockDb.message.create.mockResolvedValue({ id: "out1" });
   mockDb.message.update.mockResolvedValue({});
+  // FIX 2: claim atomico ottenuto di default.
+  mockDb.conversation.updateMany.mockResolvedValue({ count: 1 });
+  // FIX 2c: il re-check anti-staleness vede lo stesso ultimo messaggio della
+  // history corrente (non stale) — allinea findFirst al findMany del test.
+  mockDb.message.findFirst.mockImplementation(async () => {
+    const recent = await mockDb.message.findMany();
+    return recent[0] ?? null;
+  });
   mockSendText.mockResolvedValue({ messageId: "wamid1", timestamp: 1780000000 });
 });
 

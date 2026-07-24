@@ -216,6 +216,7 @@ model Conversation {
   status        ConversationStatus @default(OPEN)
   lastMessageAt DateTime?
   assignedUserId String?
+  replyingAt    DateTime? // claim atomico anti-race per generateAndDeliverReply (FIX 2)
   deletedAt     DateTime?
 
   tenant   Tenant    @relation(fields: [tenantId], references: [id])
@@ -333,7 +334,10 @@ model Template {
   tenant    Tenant     @relation(fields: [tenantId], references: [id])
   campaigns Campaign[]
 
-  @@unique([tenantId, name])
+  // NOTA: NIENTE @@unique([tenantId, name]) — sarebbe totale e bloccherebbe la
+  // ricreazione dopo soft-delete. Sostituito da un indice unico PARZIALE
+  // (Template_tenantId_name_active, WHERE deletedAt IS NULL) aggiunto a mano
+  // nella migrazione SQL. La route templates cattura già P2002.
   @@index([tenantId])
 }
 
@@ -398,4 +402,6 @@ model WebhookDelivery {
   id        String   @id @default(cuid())
   key       String   @unique
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
