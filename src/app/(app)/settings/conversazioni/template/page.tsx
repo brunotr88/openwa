@@ -27,7 +27,7 @@ export default function TemplatePage() {
     if (r.ok) setList((await r.json()).templates);
   }
   useEffect(() => {
-    void load();
+    load().catch(() => alert("Errore nel caricamento dei template"));
   }, []);
 
   async function create() {

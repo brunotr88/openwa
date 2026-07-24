@@ -89,7 +89,12 @@ export async function runWithTools(
   const usage = { inputTokens: 0, outputTokens: 0 };
 
   for (let iter = 0; ; iter++) {
-    const result = await provider.generate({ ...input, messages });
+    // Giri esauriti: una generate finale SENZA tools forza un testo di
+    // chiusura invece di lasciare il cliente senza risposta su una sola
+    // tool-call finale (FIX 2).
+    const generateInput =
+      iter >= maxIters ? { ...input, messages, tools: undefined } : { ...input, messages };
+    const result = await provider.generate(generateInput);
     usage.inputTokens += result.usage.inputTokens;
     usage.outputTokens += result.usage.outputTokens;
 

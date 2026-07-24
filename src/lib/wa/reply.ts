@@ -28,6 +28,7 @@ import {
   isWithinSchedule,
   styleTemperature,
   lengthMaxTokens,
+  sanitizePromptField,
   type TenantSettings,
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
@@ -253,8 +254,10 @@ async function generateAndDeliverReplyLocked(
 
   let system = buildSystemPrompt(settings, {
     contactSummary: [
-      conversation.contact.name ? `Stai parlando con: ${conversation.contact.name}.` : null,
-      conversation.contact.profileSummary,
+      conversation.contact.name
+        ? `Stai parlando con: ${sanitizePromptField(conversation.contact.name, 80)}.`
+        : null,
+      sanitizePromptField(conversation.contact.profileSummary, 500) || null,
     ]
       .filter(Boolean)
       .join("\n"),

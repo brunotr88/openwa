@@ -51,19 +51,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         // Incremento tentativi + lockout dopo MAX_FAILED_ATTEMPTS: usato sia per
         // password errata sia per TOTP errato (altrimenti il 2FA sarebbe
-        // brute-forcabile senza contatore).
+        // brute-forcabile senza contatore). Increment ATOMICO (read-then-write
+        // sovrascriverebbe tentativi concorrenti): il lockout è deciso sul
+        // valore RITORNATO dall'update, non su una lettura precedente stale.
         const registerFailure = async (): Promise<void> => {
-          const attempts = user.failedAttempts + 1;
-          await db.user.update({
+          const updated = await db.user.update({
             where: { id: user.id },
-            data: {
-              failedAttempts: attempts,
-              lockedUntil:
-                attempts >= MAX_FAILED_ATTEMPTS
-                  ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
-                  : null,
-            },
+            data: { failedAttempts: { increment: 1 } },
+            select: { failedAttempts: true },
           });
+          if (updated.failedAttempts >= MAX_FAILED_ATTEMPTS) {
+            await db.user.update({
+              where: { id: user.id },
+              data: { lockedUntil: new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000) },
+            });
+          }
         };
 
         const validPassword = await bcrypt.compare(password, user.passwordHash);

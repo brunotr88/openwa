@@ -28,7 +28,11 @@ export async function GET(req: Request): Promise<Response> {
 const createSchema = z.object({
   tenantId: z.string().optional(),
   label: z.string().min(1).max(80),
-  scopes: z.array(z.string()).default(["messages:send"]),
+  scopes: z
+    .array(z.enum(["messages:send"]))
+    .min(1)
+    .max(5)
+    .default(["messages:send"]),
   sessionId: z.string().min(1),
 });
 

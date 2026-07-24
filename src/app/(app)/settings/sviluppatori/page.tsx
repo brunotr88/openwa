@@ -33,7 +33,7 @@ export default function SviluppatoriPage() {
     if (r.ok) setKeys((await r.json()).keys);
   }
   useEffect(() => {
-    void load();
+    load().catch(() => alert("Errore nel caricamento delle API key"));
   }, []);
   useEffect(() => {
     fetch("/api/sessions")

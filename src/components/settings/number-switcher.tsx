@@ -19,7 +19,7 @@ export function NumberSwitcher({
     <select
       value={current}
       onChange={(e) => {
-        document.cookie = `owa_settings_session=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
+        document.cookie = `owa_settings_session=${e.target.value}; path=/; max-age=31536000; samesite=lax; secure`;
         router.refresh();
       }}
       className="mb-3 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm shadow-sm"

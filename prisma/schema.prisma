@@ -256,6 +256,7 @@ model Message {
   @@index([conversationId])
   @@index([tenantId])
   @@index([status])
+  @@index([conversationId, createdAt])
 }
 
 // ─── AI Config ───────────────────────────────────────────────────────────────

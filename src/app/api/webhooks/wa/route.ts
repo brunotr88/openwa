@@ -97,7 +97,15 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
   // to resolve the real name/number via the gateway. waId is the stable,
   // suffix-stripped matching key (unchanged, so message matching still works).
   const chatId = typeof data.chatId === "string" ? data.chatId : String(data.from ?? "");
-  const body = typeof data.body === "string" ? data.body : "";
+  const rawBody = typeof data.body === "string" ? data.body : "";
+  // Media senza caption (rawBody="") viene comunque tracciato in history con
+  // un placeholder — altrimenti viene escluso dalla history (filtro body vuoti
+  // in reply.ts) e il modello perde il turno del cliente.
+  const msgType = typeof data.type === "string" ? data.type : "";
+  const isMediaType = ["image", "video", "audio", "ptt", "document", "sticker"].includes(
+    msgType
+  );
+  const body = !rawBody && isMediaType ? "[media]" : rawBody;
   const isGroup = data.isGroup === true || chatId.endsWith("@g.us");
 
   const waId = normalizeWaId(chatId);

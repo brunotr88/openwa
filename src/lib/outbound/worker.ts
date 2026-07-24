@@ -14,6 +14,7 @@ import {
   isWithinSchedule,
   styleTemperature,
   lengthMaxTokens,
+  sanitizePromptField,
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
 import { renderTemplate } from "./template";
@@ -365,8 +366,8 @@ async function resolveBody(
   if (!aiConfig) throw new Error("no AiConfig for intent compose");
   const system = buildSystemPrompt(settings, {
     contactSummary: [
-      job.contact.name ? `Stai scrivendo a: ${job.contact.name}.` : null,
-      job.contact.profileSummary,
+      job.contact.name ? `Stai scrivendo a: ${sanitizePromptField(job.contact.name, 80)}.` : null,
+      sanitizePromptField(job.contact.profileSummary, 500) || null,
     ]
       .filter(Boolean)
       .join("\n"),

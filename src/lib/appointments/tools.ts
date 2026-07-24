@@ -13,6 +13,7 @@
 import type { ToolSpec } from "@/lib/ai/provider";
 import type { ToolExecutors } from "@/lib/ai/tool-loop";
 import type { TenantSettings } from "@/lib/settings/schema";
+import { sanitizePromptField } from "@/lib/settings";
 import type { CalendarProvider } from "./types";
 import { clampBookingWindow, formatSlotItalian, zonedToUtc } from "./slots";
 
@@ -165,7 +166,8 @@ export function buildAppointmentTools(opts: AppointmentToolsOptions): {
     },
 
     book_appointment: async (input) => {
-      const name = typeof input.name === "string" ? input.name.trim() : "";
+      const name =
+        typeof input.name === "string" ? sanitizePromptField(input.name, 80) : "";
       const service =
         typeof input.service === "string" && input.service.trim()
           ? input.service.trim()

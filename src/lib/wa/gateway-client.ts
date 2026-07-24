@@ -190,8 +190,8 @@ export function contactChatId(contact: { phone: string | null; waId: string }): 
   if (contact.phone) return `${contact.phone.replace(/^\+/, "")}@c.us`;
   const waId = contact.waId;
   if (waId.includes("@")) return waId;                 // già con suffisso
-  if (/^\d{6,13}$/.test(waId)) return `${waId}@c.us`;  // sembra un numero E.164
-  if (/^\d{14,}$/.test(waId)) return `${waId}@lid`;    // LID (troppo lungo per un numero)
+  if (/^\d{6,15}$/.test(waId)) return `${waId}@c.us`;  // sembra un numero E.164 (max 15 cifre)
+  if (/^\d{16,}$/.test(waId)) return `${waId}@lid`;    // LID (troppo lungo per un numero E.164)
   return null;                                          // non inviabile
 }
 

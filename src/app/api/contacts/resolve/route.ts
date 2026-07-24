@@ -10,6 +10,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getActor, resolveTenantId } from "@/lib/authz";
 import { auditLog } from "@/lib/audit";
+import { rateLimit } from "@/lib/rate-limit";
 import { getContact } from "@/lib/wa/gateway-client";
 import {
   candidateContactIds,
@@ -30,6 +31,10 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function POST(req: Request): Promise<Response> {
   const actor = await getActor();
   if (!actor) return Response.json({ error: "unauthorized" }, { status: 401 });
+
+  if (!rateLimit(`contacts-resolve:${actor.userId}`, 20, 60_000).allowed) {
+    return Response.json({ error: "rate_limited" }, { status: 429 });
+  }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => undefined));
   const requested = parsed.success ? parsed.data?.tenantId : undefined;
