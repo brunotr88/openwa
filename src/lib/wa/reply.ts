@@ -268,13 +268,18 @@ async function generateAndDeliverReplyLocked(
   const apptPrompt = appointmentSystemPrompt(settings);
   if (apptPrompt) system = `${system}\n\n${apptPrompt}`;
 
-  // AUTO requires: conversation AUTO + tenant aiMode AUTO + afterHoursMode
-  // allows it now + no escalation guard tripped. Otherwise degrade to
-  // COPILOT behaviour (draft for the operator). Computed BEFORE generation:
-  // the booking tool must not create real events for un-approved drafts.
+  // Auto-invio richiede: la conversazione impostata esplicitamente su AUTO
+  // (interruttore "live" per-conversazione) + l'AI non globalmente spenta
+  // (aiMode != OFF) + orari ok + nessuna guardia di escalation. Così il
+  // globale può restare COPILOT (tutti i clienti in bozza) e SOLO le
+  // conversazioni messe su AUTO a mano rispondono live. Le conversazioni
+  // nuove nascono con mode = aiMode (COPILOT) → restano bozze.
+  // Calcolato PRIMA della generazione: il tool prenotazione non deve creare
+  // eventi reali per bozze non approvate.
+  // (aiMode OFF è già gestito sopra con un return: qui è AUTO o COPILOT, e la
+  //  conversazione su AUTO è di per sé l'opt-in "live" esplicito.)
   const autoAllowed =
     conversation.mode === "AUTO" &&
-    settings.behavior.aiMode === "AUTO" &&
     autoSendAllowedNow(settings.hours) &&
     !matchedKeyword &&
     !maxTurnsReached &&

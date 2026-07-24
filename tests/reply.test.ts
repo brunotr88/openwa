@@ -219,17 +219,24 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
   });
 
-  it("falls back to DRAFT when tenant aiMode is COPILOT", async () => {
+  // Interruttore "live" per-conversazione: una conversazione impostata su AUTO
+  // auto-invia ANCHE se il globale aiMode è COPILOT (il globale COPILOT vale
+  // come default per le conversazioni nuove, non blocca quelle già su AUTO).
+  it("auto-invia quando la conversazione è AUTO anche con aiMode globale COPILOT", async () => {
     mockDb.tenant.findUnique.mockResolvedValue(
       tenantSettingsFixture({ behavior: { aiMode: "COPILOT" } })
     );
     await generateAndDeliverReply("conv1");
-    expect(mockSendText).not.toHaveBeenCalled();
+    expect(mockSendText).toHaveBeenCalled();
     expect(mockDb.message.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: "DRAFT", aiGenerated: true }),
+        data: expect.objectContaining({ status: "QUEUED", aiGenerated: true }),
       })
     );
+    expect(mockDb.message.update).toHaveBeenCalledWith({
+      where: { id: expect.any(String) },
+      data: { status: "SENT" },
+    });
   });
 
   it("does nothing when tenant aiMode is OFF", async () => {
