@@ -31,7 +31,7 @@ export function BotPlayground({
   open: boolean;
   onClose: () => void;
 }) {
-  const { tenantId, settings, save } = useSettings();
+  const { tenantId, sessionId, settings, save } = useSettings();
   const [messages, setMessages] = useState<PlayMsg[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -63,6 +63,7 @@ export function BotPlayground({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenantId,
+          sessionId,
           messages: next.map((m) => ({ role: m.role, content: m.content })),
           draftSettings: settings,
         }),

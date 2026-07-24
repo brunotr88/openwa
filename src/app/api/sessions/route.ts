@@ -15,6 +15,7 @@ import {
   deleteSession,
   GatewayError,
 } from "@/lib/wa/gateway-client";
+import { reconcileStaleConnected } from "@/lib/wa/session-reconcile";
 
 export const dynamic = "force-dynamic";
 
@@ -48,9 +49,13 @@ export async function GET(): Promise<Response> {
       status: true,
       lastSeenAt: true,
       createdAt: true,
+      sessionDataRef: true,
     },
   });
-  return Response.json({ sessions });
+  const reconciled = await reconcileStaleConnected(sessions);
+  return Response.json({
+    sessions: reconciled.map(({ sessionDataRef: _sessionDataRef, ...s }) => s),
+  });
 }
 
 export async function POST(req: Request): Promise<Response> {

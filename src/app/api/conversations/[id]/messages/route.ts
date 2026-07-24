@@ -49,8 +49,9 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
     },
   });
 
+  let sendResult;
   try {
-    await sendText(
+    sendResult = await sendText(
       conversation.session.sessionDataRef,
       conversation.contact.phone ?? conversation.contact.waId,
       parsed.data.body
@@ -66,7 +67,7 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
 
   await db.message.update({
     where: { id: message.id },
-    data: { status: "SENT" },
+    data: { status: "SENT", waMessageId: sendResult.messageId },
   });
   await db.conversation.update({
     where: { id: conversation.id },

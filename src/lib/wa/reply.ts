@@ -32,7 +32,7 @@ import {
   type TenantSettings,
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
-import { zonedDate, zonedToUtc } from "@/lib/appointments/slots";
+import { countSentToday } from "@/lib/outbound/daily-cap";
 import { sendText, contactChatId } from "./gateway-client";
 
 /** Hard cap sul ritardo "umano" prima dell'invio (whatsapp-ops: max 10 s). */
@@ -236,20 +236,10 @@ async function generateAndDeliverReplyLocked(
   const aiTurns = countConsecutiveAiTurns(recent);
   const maxTurnsReached = aiTurns >= settings.behavior.maxAiTurns;
 
-  // Cap giornaliero calcolato nel fuso orario del tenant (settings.hours.timezone),
-  // non nel fuso del server: "inizio di oggi" = mezzanotte locale del tenant.
+  // Cap giornaliero: stessa definizione di GET /api/settings e del worker
+  // outbound (countSentToday) — tutti gli OUT (manuali + AI), fuso tenant.
   const tz = settings.hours.timezone;
-  const today = zonedDate(new Date(), tz);
-  const startOfDay = zonedToUtc(today.y, today.m, today.d, 0, 0, tz);
-  const sentToday = await db.message.count({
-    where: {
-      conversation: { sessionId: conversation.sessionId },
-      direction: "OUT",
-      aiGenerated: true,
-      status: { in: ["SENT", "DELIVERED", "READ"] },
-      createdAt: { gte: startOfDay },
-    },
-  });
+  const sentToday = await countSentToday(conversation.sessionId, tz);
   const dailyCapReached = sentToday >= settings.sending.dailyCap;
 
   let system = buildSystemPrompt(settings, {
@@ -415,10 +405,10 @@ async function generateAndDeliverReplyLocked(
       throw new Error(`contact ${conversation.contact.id} has no sendable chat id`);
     }
     await humanDelay(settings);
-    await sendText(gwSessionId, chatId, text);
+    const sendResult = await sendText(gwSessionId, chatId, text);
     await db.message.update({
       where: { id: message.id },
-      data: { status: "SENT" },
+      data: { status: "SENT", waMessageId: sendResult.messageId },
     });
     await db.conversation.update({
       where: { id: conversation.id },

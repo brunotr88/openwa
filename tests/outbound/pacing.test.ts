@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { isJobDue, backoffDelayMs, evaluateSendEligibility, isJobExpired } from "@/lib/outbound/pacing";
+import {
+  isJobDue,
+  backoffDelayMs,
+  evaluateSendEligibility,
+  isJobExpired,
+  applyWarmupCap,
+} from "@/lib/outbound/pacing";
 import type { SendGate } from "@/lib/outbound/types";
 
 const base = (over: Partial<SendGate> = {}): SendGate => ({
@@ -15,6 +21,8 @@ const base = (over: Partial<SendGate> = {}): SendGate => ({
   businessHoursOnlyOutbound: true,
   withinHours: true,
   pauseOnRisk: true,
+  replyOnlyMode: false,
+  isColdOutbound: false,
   ...over,
 });
 
@@ -90,6 +98,41 @@ describe("evaluateSendEligibility", () => {
     expect(
       evaluateSendEligibility(base({ withinHours: false, businessHoursOnlyOutbound: false })).ok
     ).toBe(true);
+  });
+  it("blocca l'outbound a freddo (campagna) se replyOnlyMode è attivo", () => {
+    const d = evaluateSendEligibility(
+      base({ replyOnlyMode: true, isColdOutbound: true })
+    );
+    expect(d.ok).toBe(false);
+    expect(d.reason).toBe("reply_only_mode");
+    expect(d.retryAfterMs).toBeGreaterThan(0);
+  });
+  it("replyOnlyMode non blocca le risposte (isColdOutbound false)", () => {
+    expect(
+      evaluateSendEligibility(base({ replyOnlyMode: true, isColdOutbound: false })).ok
+    ).toBe(true);
+  });
+  it("replyOnlyMode off non blocca l'outbound a freddo", () => {
+    expect(
+      evaluateSendEligibility(base({ replyOnlyMode: false, isColdOutbound: true })).ok
+    ).toBe(true);
+  });
+});
+
+describe("applyWarmupCap", () => {
+  it("riduce fortemente il cap il giorno 0 (numero appena connesso)", () => {
+    expect(applyWarmupCap(1000, 0)).toBe(100);
+  });
+  it("ramp cresce nei giorni successivi", () => {
+    expect(applyWarmupCap(1000, 6)).toBe(300);
+    expect(applyWarmupCap(1000, 13)).toBe(850);
+  });
+  it("dopo 14 giorni applica il cap configurato per intero", () => {
+    expect(applyWarmupCap(1000, 14)).toBe(1000);
+    expect(applyWarmupCap(1000, 90)).toBe(1000);
+  });
+  it("non scende mai sotto 1", () => {
+    expect(applyWarmupCap(1, 0)).toBe(1);
   });
 });
 

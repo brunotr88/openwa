@@ -17,8 +17,9 @@ import {
   sanitizePromptField,
 } from "@/lib/settings";
 import { getSessionSettings } from "@/lib/settings/session";
+import { countSentToday } from "./daily-cap";
 import { renderTemplate } from "./template";
-import { evaluateSendEligibility, isJobExpired, backoffDelayMs } from "./pacing";
+import { evaluateSendEligibility, isJobExpired, backoffDelayMs, applyWarmupCap } from "./pacing";
 import type { OutboundPayload } from "./types";
 
 const MAX_PER_SESSION_PER_TICK = 1;
@@ -137,22 +138,15 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
 
   const settings = await getSessionSettings(job.sessionId);
 
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
   const startOfHour = new Date(now);
   startOfHour.setMinutes(0, 0, 0);
   // NB: cap e spacing sono aggregati PER-SESSIONE (numero) — ogni numero ha i
   // propri limiti anti-ban, condivisi con le risposte AI in entrata del numero.
+  // sentToday: stessa definizione di GET /api/settings e del guard AI in
+  // reply.ts (countSentToday) — tutti gli OUT, fuso tenant.
   const sessionFilter = { conversation: { sessionId: job.sessionId } } as const;
   const [sentToday, sentThisHour, lastOut] = await Promise.all([
-    db.message.count({
-      where: {
-        ...sessionFilter,
-        direction: "OUT",
-        status: { in: ["SENT", "DELIVERED", "READ"] },
-        createdAt: { gte: startOfDay },
-      },
-    }),
+    countSentToday(job.sessionId, settings.hours.timezone, now),
     db.message.count({
       where: {
         ...sessionFilter,
@@ -179,19 +173,32 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
     job.contact.optInStatus !== "OUT" &&
     (job.contact.optInStatus === "IN" || inbound > 0);
 
+  // sending.warmupMode: sui numeri connessi da poco (< 14gg) i cap configurati
+  // vengono ridotti a una frazione crescente (vedi pacing.ts applyWarmupCap).
+  const sessionAgeDays =
+    (now.getTime() - job.session.createdAt.getTime()) / (24 * 3_600_000);
+  const dailyCap = settings.sending.warmupMode
+    ? applyWarmupCap(settings.sending.dailyCap, sessionAgeDays)
+    : settings.sending.dailyCap;
+  const hourlyCap = settings.sending.warmupMode
+    ? applyWarmupCap(settings.sending.hourlyCap, sessionAgeDays)
+    : settings.sending.hourlyCap;
+
   const decision = evaluateSendEligibility({
     sessionStatus: job.session.status,
     optedIn,
     sentToday,
-    dailyCap: settings.sending.dailyCap,
+    dailyCap,
     sentThisHour,
-    hourlyCap: settings.sending.hourlyCap,
+    hourlyCap,
     lastSendAt: lastOut?.createdAt ?? null,
     minSpacingMs: settings.sending.delayMinMs,
     now,
     businessHoursOnlyOutbound: settings.sending.businessHoursOnlyOutbound,
     withinHours: isWithinSchedule(settings.hours, now),
     pauseOnRisk: settings.sending.pauseOnRisk,
+    replyOnlyMode: settings.sending.replyOnlyMode,
+    isColdOutbound: job.campaignId != null,
   });
 
   if (!decision.ok) {
@@ -247,10 +254,11 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
   //    partita → consegna AMBIGUA → fail-closed, MAI ri-inviato (at-most-once).
   //  - qualsiasi altro errore (ref mancante, GatewayError con 4xx/5xx = rifiuto
   //    pre-consegna) → retry con backoff come prima.
+  let sendResult: Awaited<ReturnType<typeof sendText>>;
   try {
     const gwId = job.session.sessionDataRef;
     if (!gwId) throw new Error("session has no gateway ref");
-    await sendText(gwId, chatId, finalBody);
+    sendResult = await sendText(gwId, chatId, finalBody);
   } catch (e) {
     if (e instanceof GatewayError && e.status === undefined) {
       return await markFailedNoRetry(job.id, job.tenantId, "send_ambiguous");
@@ -271,6 +279,7 @@ export async function sendOneJob(jobId: string, now: Date): Promise<JobOutcome> 
         status: "SENT",
         aiGenerated: job.mode === "INTENT",
         source: job.source,
+        waMessageId: sendResult.messageId,
       },
       select: { id: true },
     });

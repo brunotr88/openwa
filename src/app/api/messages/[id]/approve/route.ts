@@ -58,8 +58,9 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
     return Response.json({ error: "already_processed" }, { status: 409 });
   }
 
+  let sendResult;
   try {
-    await sendText(
+    sendResult = await sendText(
       conversation.session.sessionDataRef,
       conversation.contact.phone ?? conversation.contact.waId,
       finalBody
@@ -75,7 +76,7 @@ export async function POST(req: Request, { params }: Params): Promise<Response> 
 
   await db.message.update({
     where: { id: message.id },
-    data: { body: finalBody, status: "SENT" },
+    data: { body: finalBody, status: "SENT", waMessageId: sendResult.messageId },
   });
   await db.conversation.update({
     where: { id: conversation.id },

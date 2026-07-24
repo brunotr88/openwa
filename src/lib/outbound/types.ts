@@ -18,6 +18,10 @@ export interface SendGate {
   businessHoursOnlyOutbound: boolean;
   withinHours: boolean;
   pauseOnRisk: boolean;
+  /** sending.replyOnlyMode: se attivo, blocca l'outbound a freddo (job di campagna). */
+  replyOnlyMode: boolean;
+  /** true se il job non è una risposta a un contatto (es. campagna proattiva). */
+  isColdOutbound: boolean;
 }
 
 export interface SendDecision {

@@ -171,9 +171,16 @@ export function SessionsClient({
 
   async function onStop(id: string) {
     setBusy(true);
+    setError(null);
     try {
-      await fetch(`/api/sessions/${id}/stop`, { method: "POST" });
+      const res = await fetch(`/api/sessions/${id}/stop`, { method: "POST" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Errore nell'arresto della sessione.");
+      }
       await refresh();
+    } catch {
+      setError("Errore di rete.");
     } finally {
       setBusy(false);
     }
@@ -184,10 +191,18 @@ export function SessionsClient({
       return;
     }
     setBusy(true);
+    setError(null);
     try {
-      await fetch(`/api/sessions/${id}`, { method: "DELETE" });
-      if (pairingId === id) setPairingId(null);
+      const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(data.error ?? "Errore nell'eliminazione della sessione.");
+      } else if (pairingId === id) {
+        setPairingId(null);
+      }
       await refresh();
+    } catch {
+      setError("Errore di rete.");
     } finally {
       setBusy(false);
     }

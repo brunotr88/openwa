@@ -249,6 +249,9 @@ model Message {
   aiGenerated    Boolean         @default(false)
   source         MessageSource   @default(WA)
   createdAt      DateTime        @default(now())
+  // Id del messaggio lato gateway WA (risposta di send-text), usato per
+  // matchare gli eventi message.ack (DELIVERED/READ) al Message OUT corretto.
+  waMessageId    String?         @unique
 
   conversation Conversation @relation(fields: [conversationId], references: [id])
   tenant       Tenant       @relation(fields: [tenantId], references: [id])

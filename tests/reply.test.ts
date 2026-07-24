@@ -158,7 +158,7 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
     expect(mockDb.message.update).toHaveBeenCalledWith({
       where: { id: "out1" },
-      data: { status: "SENT" },
+      data: { status: "SENT", waMessageId: "wamid1" },
     });
     // audit-logged
     expect(mockAuditLog).toHaveBeenCalledWith(
@@ -235,7 +235,7 @@ describe("generateAndDeliverReply — AUTO", () => {
     );
     expect(mockDb.message.update).toHaveBeenCalledWith({
       where: { id: expect.any(String) },
-      data: { status: "SENT" },
+      data: { status: "SENT", waMessageId: "wamid1" },
     });
   });
 

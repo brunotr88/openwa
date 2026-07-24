@@ -1,6 +1,6 @@
 /**
  * Conversation detail + mode toggle.
- * GET   → conversation with messages (oldest first)
+ * GET   → conversation with the 200 most recent messages (oldest first)
  * PATCH → { mode: AUTO|COPILOT|MANUAL }
  */
 import { z } from "zod";
@@ -26,7 +26,7 @@ export async function GET(_req: Request, { params }: Params): Promise<Response> 
     include: {
       contact: { select: { id: true, waId: true, name: true, phone: true } },
       messages: {
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "desc" },
         take: 200,
         select: {
           id: true,
@@ -51,7 +51,9 @@ export async function GET(_req: Request, { params }: Params): Promise<Response> 
       status: conversation.status,
       lastMessageAt: conversation.lastMessageAt,
       contact: conversation.contact,
-      messages: conversation.messages,
+      // messages fetched newest-first (desc + take 200) to keep the most recent
+      // window on long threads; reverse to the oldest-first order the FE expects.
+      messages: [...conversation.messages].reverse(),
     },
   });
 }

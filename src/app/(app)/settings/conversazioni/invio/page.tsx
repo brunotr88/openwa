@@ -247,9 +247,11 @@ export default function InvioPage() {
         />
         <SwitchSetting
           label="Indicatore «sta scrivendo…»"
-          description="Mostra 'sta scrivendo…' prima di rispondere: rende il bot indistinguibile da un operatore e migliora l'esperienza."
+          description="Mostra 'sta scrivendo…' prima di rispondere: rende il bot indistinguibile da un operatore e migliora l'esperienza. In arrivo: il gateway non supporta ancora l'invio della presence, quindi il flag non ha effetto e resta bloccato per non dare un falso senso di sicurezza."
           checked={sending.typingIndicator}
           recommended
+          locked
+          lockedHint="In arrivo: richiede supporto presence lato gateway, non ancora disponibile."
           onChange={(v) => void save({ sending: { typingIndicator: v } })}
         />
         <SwitchSetting

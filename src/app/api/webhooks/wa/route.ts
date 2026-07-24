@@ -11,6 +11,8 @@
  * - message.received → JID/type filtering (whatsapp-ops.md), upsert Contact,
  *   find/create OPEN Conversation, Message(IN, RECEIVED, WA), then
  *   fire-and-forget reply pipeline
+ * - message.ack → matches Message.waMessageId (OUT), maps ack≥2→DELIVERED,
+ *   ack≥3→READ (whatsapp-web.js ACK semantics)
  * - session.status / session.authenticated / session.disconnected →
  *   map gateway status onto WaSession.status
  *
@@ -27,10 +29,9 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import { generateAndDeliverReply } from "@/lib/wa/reply";
 import { shouldIgnoreInbound, normalizeWaId } from "@/lib/wa/inbound-filter";
-import { getContact } from "@/lib/wa/gateway-client";
+import { getContact, mapGatewayStatus } from "@/lib/wa/gateway-client";
 import { mapGatewayContact, resolutionPatch } from "@/lib/wa/contact-resolve";
 import { getSessionSettings } from "@/lib/settings/session";
-import type { WaSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -58,25 +59,6 @@ function verifySignature(rawBody: string, header: string | null): boolean {
   const b = Buffer.from(expected);
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
-}
-
-/** Map gateway session status strings onto our WaSessionStatus enum. */
-function mapGatewayStatus(status: string): WaSessionStatus | null {
-  switch (status) {
-    case "ready":
-    case "connected":
-      return "CONNECTED";
-    case "qr_ready":
-    case "qr":
-      return "QR";
-    case "disconnected":
-    case "logged_out":
-    case "failed":
-      return "OFFLINE";
-    default:
-      // initializing / authenticating: transient — keep current status
-      return null;
-  }
 }
 
 async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
@@ -209,9 +191,18 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
     where: { id: conversation.id },
     data: { lastMessageAt: new Date() },
   });
+  // Un messaggio in arrivo è prova che il gateway è connesso: se lo status
+  // webhook è andato perso, la sessione può restare bloccata su OFFLINE/QR
+  // pur ricevendo regolarmente (e il worker outbound la blocca per
+  // session_offline). Auto-guarigione qui, tranne per BANNED (stato definitivo).
   await db.waSession.update({
     where: { id: session.id },
-    data: { lastSeenAt: new Date() },
+    data: {
+      lastSeenAt: new Date(),
+      ...(session.status !== "CONNECTED" && session.status !== "BANNED"
+        ? { status: "CONNECTED" }
+        : {}),
+    },
   });
 
   // Reply pipeline — fire-and-forget so the gateway gets a fast 200.
@@ -223,6 +214,42 @@ async function handleMessageReceived(envelope: WebhookEnvelope): Promise<void> {
       console.error(`[webhook/wa] reply pipeline failed for ${conversationId}:`, e);
     });
   }
+}
+
+/**
+ * Map a whatsapp-web.js-style numeric ACK onto our MessageStatus.
+ * ACK_ERROR=-1, PENDING=0, SERVER=1, DEVICE=2 (delivered), READ=3, PLAYED=4.
+ * Anything below DEVICE(2) is left alone (message already SENT, no update needed).
+ */
+function mapAckToStatus(ack: number): "DELIVERED" | "READ" | null {
+  if (ack >= 3) return "READ";
+  if (ack >= 2) return "DELIVERED";
+  return null;
+}
+
+async function handleMessageAck(envelope: WebhookEnvelope): Promise<void> {
+  const data = envelope.data ?? {};
+  const waMessageId =
+    typeof data.id === "string"
+      ? data.id
+      : typeof data.messageId === "string"
+        ? data.messageId
+        : null;
+  const ack = typeof data.ack === "number" ? data.ack : null;
+  if (!waMessageId || ack === null) return;
+
+  const status = mapAckToStatus(ack);
+  if (!status) return;
+
+  // Never regress READ back to DELIVERED (out-of-order/duplicate ack delivery).
+  await db.message.updateMany({
+    where: {
+      waMessageId,
+      direction: "OUT",
+      status: status === "READ" ? { in: ["SENT", "DELIVERED"] } : "SENT",
+    },
+    data: { status },
+  });
 }
 
 async function handleSessionStatus(envelope: WebhookEnvelope): Promise<void> {
@@ -288,13 +315,16 @@ export async function POST(req: Request): Promise<Response> {
       case "message.received":
         await handleMessageReceived(envelope);
         break;
+      case "message.ack":
+        await handleMessageAck(envelope);
+        break;
       case "session.status":
       case "session.authenticated":
       case "session.disconnected":
         await handleSessionStatus(envelope);
         break;
       default:
-        break; // ignore unhandled events (test, message.ack, ...)
+        break; // ignore unhandled events (test, ...)
     }
   } catch (e) {
     console.error(`[webhook/wa] handler error for ${envelope.event}:`, e);

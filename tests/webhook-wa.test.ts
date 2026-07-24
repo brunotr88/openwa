@@ -9,7 +9,7 @@ const { mockDb, mockGenerateReply } = vi.hoisted(() => ({
     contact: { upsert: vi.fn(), update: vi.fn() },
     tenant: { findUnique: vi.fn() },
     conversation: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    message: { create: vi.fn() },
+    message: { create: vi.fn(), updateMany: vi.fn() },
     webhookDelivery: { create: vi.fn(), findUnique: vi.fn() },
   },
   mockGenerateReply: vi.fn(),
@@ -99,6 +99,7 @@ beforeEach(() => {
   mockDb.conversation.create.mockResolvedValue({ id: "conv1", mode: "AUTO" });
   mockDb.conversation.update.mockResolvedValue({});
   mockDb.message.create.mockResolvedValue({ id: "m1" });
+  mockDb.message.updateMany.mockResolvedValue({ count: 1 });
   mockDb.webhookDelivery.create.mockResolvedValue({});
   mockDb.webhookDelivery.findUnique.mockResolvedValue(null);
   mockGenerateReply.mockResolvedValue("m2");
@@ -237,6 +238,84 @@ describe("POST /api/webhooks/wa — message.received", () => {
     const res = await POST(makeRequest(messageReceivedEnvelope()));
     expect(res.status).toBe(200);
     expect(mockDb.message.create).not.toHaveBeenCalled();
+  });
+
+  it("self-heals a stale OFFLINE session back to CONNECTED on inbound message", async () => {
+    mockDb.waSession.findFirst.mockResolvedValue({
+      id: "wa1",
+      tenantId: "t1",
+      sessionDataRef: "sess-abc",
+      status: "OFFLINE",
+    });
+    const res = await POST(makeRequest(messageReceivedEnvelope()));
+    expect(res.status).toBe(200);
+    expect(mockDb.waSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "wa1" },
+        data: expect.objectContaining({ status: "CONNECTED", lastSeenAt: expect.any(Date) }),
+      })
+    );
+  });
+
+  it("does NOT resurrect a BANNED session on inbound message", async () => {
+    mockDb.waSession.findFirst.mockResolvedValue({
+      id: "wa1",
+      tenantId: "t1",
+      sessionDataRef: "sess-abc",
+      status: "BANNED",
+    });
+    const res = await POST(makeRequest(messageReceivedEnvelope()));
+    expect(res.status).toBe(200);
+    expect(mockDb.waSession.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "wa1" },
+        data: { lastSeenAt: expect.any(Date) },
+      })
+    );
+  });
+});
+
+// ── message.ack ───────────────────────────────────────────────────────────────
+
+describe("POST /api/webhooks/wa — message.ack", () => {
+  function ackEnvelope(data: Record<string, unknown>) {
+    return {
+      event: "message.ack",
+      timestamp: "2026-06-10T10:00:00.000Z",
+      sessionId: "gw-session-uuid",
+      idempotencyKey: "ack_1",
+      data,
+    };
+  }
+
+  it("ack=2 (device) → DELIVERED, matched by waMessageId, OUT only, not regressing READ", async () => {
+    const res = await POST(makeRequest(ackEnvelope({ id: "wamid.ABC", ack: 2 })));
+    expect(res.status).toBe(200);
+    expect(mockDb.message.updateMany).toHaveBeenCalledWith({
+      where: { waMessageId: "wamid.ABC", direction: "OUT", status: "SENT" },
+      data: { status: "DELIVERED" },
+    });
+  });
+
+  it("ack=3 (read) → READ, allows matching SENT or DELIVERED (no regression to DELIVERED)", async () => {
+    const res = await POST(makeRequest(ackEnvelope({ id: "wamid.ABC", ack: 3 })));
+    expect(res.status).toBe(200);
+    expect(mockDb.message.updateMany).toHaveBeenCalledWith({
+      where: { waMessageId: "wamid.ABC", direction: "OUT", status: { in: ["SENT", "DELIVERED"] } },
+      data: { status: "READ" },
+    });
+  });
+
+  it("ack below DEVICE (0/1) does nothing", async () => {
+    const res = await POST(makeRequest(ackEnvelope({ id: "wamid.ABC", ack: 1 })));
+    expect(res.status).toBe(200);
+    expect(mockDb.message.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("missing id or ack is ignored safely", async () => {
+    const res = await POST(makeRequest(ackEnvelope({ ack: 3 })));
+    expect(res.status).toBe(200);
+    expect(mockDb.message.updateMany).not.toHaveBeenCalled();
   });
 });
 

@@ -8,7 +8,7 @@
  */
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getActor, resolveTenantId } from "@/lib/authz";
+import { getActor, resolveTenantId, canAccessTenant } from "@/lib/authz";
 import { auditLog } from "@/lib/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { getContact } from "@/lib/wa/gateway-client";
@@ -38,66 +38,93 @@ export async function POST(req: Request): Promise<Response> {
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => undefined));
   const requested = parsed.success ? parsed.data?.tenantId : undefined;
-  const tenantId = await resolveTenantId(actor, requested);
-  if (!tenantId) return Response.json({ error: "no tenant" }, { status: 400 });
 
-  // Need a gateway session id to call the contacts endpoint.
-  const session = await db.waSession.findFirst({
-    where: {
+  // No explicit tenant requested and the actor is scoped to specific tenants
+  // (not a global admin): the inbox spans every accessible tenant, so the
+  // backfill must too — otherwise only the first tenant's contacts resolve.
+  let tenantIds: string[];
+  if (requested) {
+    if (!canAccessTenant(actor, requested)) {
+      return Response.json({ error: "no tenant" }, { status: 400 });
+    }
+    tenantIds = [requested];
+  } else if (actor.tenantIds && actor.tenantIds.length > 0) {
+    tenantIds = actor.tenantIds;
+  } else {
+    const fallback = await resolveTenantId(actor, undefined);
+    if (!fallback) return Response.json({ error: "no tenant" }, { status: 400 });
+    tenantIds = [fallback];
+  }
+
+  let updated = 0;
+  let scanned = 0;
+  let anySessionFound = false;
+
+  for (const tenantId of tenantIds) {
+    // Need a gateway session id to call the contacts endpoint.
+    const session = await db.waSession.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        status: "CONNECTED",
+        sessionDataRef: { not: null },
+      },
+      orderBy: { lastSeenAt: { sort: "desc", nulls: "last" } },
+      select: { sessionDataRef: true },
+    });
+    if (!session?.sessionDataRef) continue; // stale/no session for this tenant → skip, don't abort the others
+    const gwSessionId = session.sessionDataRef;
+    anySessionFound = true;
+
+    const contacts = await db.contact.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [{ name: null }, { phone: null }],
+      },
+      take: MAX_PER_RUN,
+      select: { id: true, waId: true, name: true, phone: true },
+    });
+
+    for (const c of contacts) {
+      scanned++;
+      for (const candidate of candidateContactIds(c.waId)) {
+        let gwContact;
+        try {
+          gwContact = await getContact(gwSessionId, candidate);
+        } catch {
+          // Session status in DB was stale (e.g. actually disconnected) —
+          // skip this contact instead of aborting the whole run.
+          break;
+        }
+        const resolved = mapGatewayContact(gwContact);
+        const patch = resolutionPatch(resolved, { name: c.name, phone: c.phone });
+        if (Object.keys(patch).length > 0) {
+          await db.contact.update({ where: { id: c.id }, data: patch });
+          updated++;
+          break; // resolved → don't try the other suffix
+        }
+        // If we got a real phone but no new fields (already set), stop too.
+        if (resolved.phone || resolved.name) break;
+      }
+      await sleep(DELAY_MS);
+    }
+
+    await auditLog({
+      userId: actor.userId,
       tenantId,
-      deletedAt: null,
-      status: "CONNECTED",
-      sessionDataRef: { not: null },
-    },
-    orderBy: { lastSeenAt: { sort: "desc", nulls: "last" } },
-    select: { sessionDataRef: true },
-  });
-  if (!session?.sessionDataRef) {
+      action: "contact.resolve.backfill",
+      entity: "Contact",
+      meta: { scanned: contacts.length, updated },
+    });
+  }
+
+  if (!anySessionFound) {
     return Response.json(
       { error: "Nessuna sessione WhatsApp connessa per questo tenant." },
       { status: 409 }
     );
   }
-  const gwSessionId = session.sessionDataRef;
-
-  const contacts = await db.contact.findMany({
-    where: {
-      tenantId,
-      deletedAt: null,
-      OR: [{ name: null }, { phone: null }],
-    },
-    take: MAX_PER_RUN,
-    select: { id: true, waId: true, name: true, phone: true },
-  });
-
-  let updated = 0;
-  let scanned = 0;
-  for (const c of contacts) {
-    scanned++;
-    let patchApplied = false;
-    for (const candidate of candidateContactIds(c.waId)) {
-      const resolved = mapGatewayContact(await getContact(gwSessionId, candidate));
-      const patch = resolutionPatch(resolved, { name: c.name, phone: c.phone });
-      if (Object.keys(patch).length > 0) {
-        await db.contact.update({ where: { id: c.id }, data: patch });
-        updated++;
-        patchApplied = true;
-        break; // resolved → don't try the other suffix
-      }
-      // If we got a real phone but no new fields (already set), stop too.
-      if (resolved.phone || resolved.name) break;
-    }
-    void patchApplied;
-    if (scanned < contacts.length) await sleep(DELAY_MS);
-  }
-
-  await auditLog({
-    userId: actor.userId,
-    tenantId,
-    action: "contact.resolve.backfill",
-    entity: "Contact",
-    meta: { scanned, updated },
-  });
 
   return Response.json({ ok: true, scanned, updated });
 }

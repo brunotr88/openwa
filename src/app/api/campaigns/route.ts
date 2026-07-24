@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
-import { getActor, resolveTenantId } from "@/lib/authz";
+import { getActor, resolveTenantId, canAccessTenant } from "@/lib/authz";
 import { pickSession } from "@/lib/outbound/enqueue";
 import { launchCampaign, campaignStats } from "@/lib/outbound/campaign";
 
@@ -24,6 +24,7 @@ export async function GET(req: Request): Promise<Response> {
       totalRecipients: true,
       scheduledAt: true,
       createdAt: true,
+      session: { select: { id: true, phoneLabel: true } },
     },
   });
   const withStats = await Promise.all(
@@ -35,6 +36,7 @@ export async function GET(req: Request): Promise<Response> {
 const createSchema = z
   .object({
     tenantId: z.string().optional(),
+    sessionId: z.string().optional(),
     name: z.string().min(1).max(120),
     mode: z.enum(["text", "template"]),
     body: z.string().max(4096).optional(),
@@ -54,10 +56,28 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.success) {
     return Response.json({ error: "invalid body", issues: parsed.error.issues }, { status: 400 });
   }
-  const tenantId = await resolveTenantId(actor, parsed.data.tenantId ?? null);
+  // Numero mittente: se il FE indica sessionId (numero scelto nello switcher),
+  // il tenant si deriva da quella sessione — non da resolveTenantId (che
+  // sceglierebbe arbitrariamente il primo tenant dell'attore). Senza
+  // sessionId si torna al comportamento precedente (compat).
+  let tenantId: string | null;
+  let session: { id: string } | null;
+  if (parsed.data.sessionId) {
+    const s = await db.waSession.findFirst({
+      where: { id: parsed.data.sessionId, deletedAt: null },
+      select: { id: true, tenantId: true },
+    });
+    if (!s || !canAccessTenant(actor, s.tenantId)) {
+      return Response.json({ error: "numero non valido" }, { status: 400 });
+    }
+    tenantId = s.tenantId;
+    session = { id: s.id };
+  } else {
+    tenantId = await resolveTenantId(actor, parsed.data.tenantId ?? null);
+    if (!tenantId) return Response.json({ error: "no tenant" }, { status: 400 });
+    session = await pickSession(tenantId);
+  }
   if (!tenantId) return Response.json({ error: "no tenant" }, { status: 400 });
-
-  const session = await pickSession(tenantId);
   if (!session) return Response.json({ error: "no whatsapp session" }, { status: 409 });
 
   const b = parsed.data;

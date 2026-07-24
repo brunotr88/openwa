@@ -5,7 +5,8 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { auditLog } from "@/lib/audit";
-import { getActor, resolveTenantId, canAccessTenant } from "@/lib/authz";
+import { getActor, canAccessTenant } from "@/lib/authz";
+import { tenantFilter } from "@/lib/tenancy";
 import { generateApiKey } from "@/lib/apikey";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,19 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   const actor = await getActor();
   if (!actor) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const tenantId = await resolveTenantId(actor, new URL(req.url).searchParams.get("tenantId"));
-  if (!tenantId) return Response.json({ error: "no tenant" }, { status: 400 });
+
+  // Lista allineata allo scope di GET /api/sessions (tutti i tenant
+  // accessibili all'attore), non solo il "primo tenant": POST /api/apikeys
+  // può creare key per qualsiasi tenant accessibile, quindi la lista deve
+  // poterle mostrare tutte. Un tenantId esplicito (se accessibile) filtra.
+  const requestedTenantId = new URL(req.url).searchParams.get("tenantId");
+  if (requestedTenantId && !canAccessTenant(actor, requestedTenantId)) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  const tenantId = requestedTenantId ?? undefined;
 
   const keys = await db.apiKey.findMany({
-    where: { tenantId, deletedAt: null },
+    where: { ...tenantFilter(actor.tenantIds), ...(tenantId ? { tenantId } : {}), deletedAt: null },
     orderBy: { createdAt: "desc" },
     select: { id: true, prefix: true, label: true, scopes: true, lastUsedAt: true, createdAt: true,
       sessionId: true, session: { select: { phoneLabel: true } } },

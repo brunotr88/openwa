@@ -289,14 +289,17 @@ describe("escalation — dailyCap forces DRAFT", () => {
     );
   });
 
-  it("counts only today's OUT aiGenerated sends, session-scoped", async () => {
+  it("counts today's OUT sends (all, session-scoped) via countSentToday", async () => {
+    // Il cap giornaliero ora usa il helper condiviso countSentToday: conta
+    // TUTTI gli OUT (manuali + AI) con status inviato, nel fuso del tenant —
+    // stessa definizione di GET /api/settings e del worker outbound.
     await generateAndDeliverReply("conv1");
     expect(mockDb.message.count).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           conversation: { sessionId: "wa1" },
           direction: "OUT",
-          aiGenerated: true,
+          status: { in: ["SENT", "DELIVERED", "READ"] },
           createdAt: { gte: expect.any(Date) },
         }),
       })

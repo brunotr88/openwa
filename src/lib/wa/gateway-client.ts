@@ -73,6 +73,35 @@ export interface GatewayContact {
   isBlocked?: boolean;
 }
 
+/**
+ * Map gateway session status strings onto our WaSessionStatus enum. Single
+ * source of truth shared by the webhook handler and the QR poll-fallback
+ * route so they never diverge (whatsapp-ops.md).
+ *
+ * NB: no gateway status string is currently confirmed for a WhatsApp ban —
+ * the fork's documented EngineStatus (GatewaySessionStatus above) doesn't
+ * list one. When that's confirmed, add it here mapping to "BANNED".
+ */
+export function mapGatewayStatus(
+  status: string
+): "CONNECTED" | "QR" | "OFFLINE" | null {
+  switch (status) {
+    case "ready":
+    case "connected":
+      return "CONNECTED";
+    case "qr_ready":
+    case "qr":
+      return "QR";
+    case "disconnected":
+    case "logged_out":
+    case "failed":
+      return "OFFLINE";
+    default:
+      // initializing / authenticating: transient — keep current status
+      return null;
+  }
+}
+
 /** Typed error for any non-2xx gateway response or network/timeout failure. */
 export class GatewayError extends Error {
   constructor(

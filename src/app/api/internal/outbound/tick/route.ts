@@ -5,6 +5,7 @@
  */
 import { timingSafeEqual } from "crypto";
 import { drainOutbound } from "@/lib/outbound/worker";
+import { autoCloseInactiveConversations } from "@/lib/inbox/auto-close";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export async function POST(req: Request): Promise<Response> {
   if (!authorized(req)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
-  const summary = await drainOutbound(new Date());
-  return Response.json({ ok: true, ...summary });
+  const now = new Date();
+  const summary = await drainOutbound(now);
+  const autoClose = await autoCloseInactiveConversations(now);
+  return Response.json({ ok: true, ...summary, autoClose });
 }

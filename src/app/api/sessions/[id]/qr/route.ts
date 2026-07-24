@@ -3,26 +3,12 @@
  */
 import { db } from "@/lib/db";
 import { getActor, canAccessTenant } from "@/lib/authz";
-import { getQr, getSession, GatewayError } from "@/lib/wa/gateway-client";
+import { getQr, getSession, GatewayError, mapGatewayStatus } from "@/lib/wa/gateway-client";
 import type { WaSessionStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
-
-function mapStatus(gwStatus: string): WaSessionStatus | null {
-  switch (gwStatus) {
-    case "ready":
-      return "CONNECTED";
-    case "qr_ready":
-      return "QR";
-    case "disconnected":
-    case "failed":
-      return "OFFLINE";
-    default:
-      return null;
-  }
-}
 
 export async function GET(_req: Request, { params }: Params): Promise<Response> {
   const actor = await getActor();
@@ -44,7 +30,7 @@ export async function GET(_req: Request, { params }: Params): Promise<Response> 
   let status: WaSessionStatus = session.status;
   try {
     const gw = await getSession(session.sessionDataRef);
-    const mapped = mapStatus(gw.status);
+    const mapped = mapGatewayStatus(gw.status);
     if (mapped && mapped !== session.status) {
       status = mapped;
       await db.waSession.update({

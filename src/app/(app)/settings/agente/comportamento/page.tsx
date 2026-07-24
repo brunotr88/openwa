@@ -78,7 +78,7 @@ export default function ComportamentoPage() {
       <SettingsCard title="Modalità del bot">
         <SettingRow
           label="Modalità AI"
-          description="Inizia in Copilot: approvi ogni bozza. Passa ad Auto quando approvi >90% delle bozze senza modificarle."
+          description="Inizia in Copilot: approvi ogni bozza. Passa ad Auto quando approvi >90% delle bozze senza modificarle. Effetto: le conversazioni nuove nascono in questa modalità; su Spento tutte le risposte AI (comprese quelle già Auto) si fermano subito. Le conversazioni già aperte in Auto restano tali finché non le cambi tu."
           stacked
         >
           <SegmentedControl

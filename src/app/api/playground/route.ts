@@ -77,9 +77,10 @@ export async function POST(req: Request): Promise<Response> {
     select: { id: true, status: true, createdAt: true },
   });
   const requested = parsed.data.sessionId;
-  const sessionId =
-    (requested && sessions.some((s) => s.id === requested) && requested) ||
-    pickPrimarySession(sessions);
+  if (requested && !sessions.some((s) => s.id === requested)) {
+    return Response.json({ error: "invalid sessionId" }, { status: 400 });
+  }
+  const sessionId = requested || pickPrimarySession(sessions);
   if (!sessionId) {
     return Response.json({ error: "no number available" }, { status: 409 });
   }

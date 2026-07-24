@@ -11,6 +11,7 @@ import { auditLog } from "@/lib/audit";
 import { getActor, resolveTenantId, canAccessTenant } from "@/lib/authz";
 import { getSessionSettings, saveSessionSettings } from "@/lib/settings/session";
 import { pickPrimarySession } from "@/lib/sessions/primary";
+import { countSentToday } from "@/lib/outbound/daily-cap";
 
 export const dynamic = "force-dynamic";
 
@@ -39,16 +40,8 @@ export async function GET(req: Request): Promise<Response> {
   const settings = await getSessionSettings(sessionId);
 
   // Trasparenza sui limiti: "Oggi: X/cap messaggi inviati" — per numero.
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  const sentToday = await db.message.count({
-    where: {
-      conversation: { sessionId },
-      direction: "OUT",
-      status: { in: ["SENT", "DELIVERED", "READ"] },
-      createdAt: { gte: startOfDay },
-    },
-  });
+  // Stessa definizione di reply.ts e worker.ts (vedi countSentToday).
+  const sentToday = await countSentToday(sessionId, settings.hours.timezone);
 
   return Response.json({ tenantId, sessionId, settings, numbers: sessions, sentToday });
 }

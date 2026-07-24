@@ -125,7 +125,7 @@ function CalendlyUrlField({
 }
 
 export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
-  const { tenantId, settings, save } = useSettings();
+  const { tenantId, sessionId, settings, save } = useSettings();
   const appt = settings.appointments;
 
   const [verifying, setVerifying] = useState(false);
@@ -142,6 +142,7 @@ export function AppuntamentiClient({ saEmail }: { saEmail: string | null }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenantId,
+          sessionId,
           ...(appt.googleCalendarId ? { calendarId: appt.googleCalendarId } : {}),
         }),
       });
