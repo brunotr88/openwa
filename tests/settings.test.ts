@@ -191,7 +191,7 @@ describe("buildSystemPrompt", () => {
 
   it("resolves preset {{placeholders}} with businessName and city", () => {
     const prompt = buildSystemPrompt(settingsWithPreset());
-    expect(prompt).toContain("Sei l'assistente WhatsApp di Pizzeria Da Mario, ristorante/pizzeria a Bologna.");
+    expect(prompt).toContain("Sei chi risponde su WhatsApp per Pizzeria Da Mario, ristorante e pizzeria a Bologna.");
     expect(prompt).not.toContain("{{");
   });
 
@@ -199,7 +199,7 @@ describe("buildSystemPrompt", () => {
     const s = settingsWithPreset();
     s.persona.city = "";
     const prompt = buildSystemPrompt(s);
-    expect(prompt).toContain("ristorante/pizzeria.");
+    expect(prompt).toContain("ristorante e pizzeria.");
     expect(prompt).not.toContain("{{");
   });
 
