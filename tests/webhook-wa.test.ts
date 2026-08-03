@@ -398,8 +398,38 @@ describe("POST /api/webhooks/wa — idempotenza (check-prima/marca-dopo-successo
     expect(body2.deduped).not.toBe(true);
     // Il messaggio è stato davvero salvato al retry, non scartato come duplicato.
     expect(mockDb.message.create).toHaveBeenCalledTimes(2);
-    // E ora la dedup-row è stata marcata (best-effort, dopo successo).
-    expect(store.has("msg_abc")).toBe(true);
+    // E ora la dedup-row è stata marcata (best-effort, dopo successo). La chiave è
+    // derivata dall'id WA del messaggio (NON dal deliveryId/idempotencyKey del
+    // gateway, inaffidabili: inviano costanti come "msg_unknown").
+    expect(store.has("recv:true_393331234567@c.us_ABC")).toBe(true);
+  });
+
+  it("due messaggi DIVERSI con lo stesso deliveryId costante del gateway (msg_unknown) vengono ENTRAMBI processati", async () => {
+    // Regressione dell'incidente 3/8: il fork invia deliveryId/idempotencyKey
+    // costante ("msg_unknown") per ogni messaggio. Se ci fidassimo di quello, solo
+    // il primo messaggio passerebbe e tutti i successivi verrebbero scartati come
+    // duplicati. La chiave deve derivare dall'id WA del messaggio.
+    const store = new Set<string>();
+    mockDb.webhookDelivery.findUnique.mockImplementation(async ({ where }: { where: { key: string } }) =>
+      store.has(where.key) ? { key: where.key } : null
+    );
+    mockDb.webhookDelivery.create.mockImplementation(async ({ data }: { data: { key: string } }) => {
+      store.add(data.key);
+      return { key: data.key };
+    });
+    mockDb.message.create.mockResolvedValue({ id: "m1" });
+
+    const common = { idempotencyKey: "msg_unknown", deliveryId: "msg_unknown" };
+    const res1 = await POST(makeRequest({ ...messageReceivedEnvelope({ id: "wamid.MSG1", body: "primo" }), ...common }));
+    const res2 = await POST(makeRequest({ ...messageReceivedEnvelope({ id: "wamid.MSG2", body: "secondo" }), ...common }));
+
+    expect(res1.status).toBe(200);
+    expect(res2.status).toBe(200);
+    expect(((await res2.json()) as { deduped?: boolean }).deduped).not.toBe(true);
+    // Entrambi salvati, chiavi distinte per-messaggio.
+    expect(mockDb.message.create).toHaveBeenCalledTimes(2);
+    expect(store.has("recv:wamid.MSG1")).toBe(true);
+    expect(store.has("recv:wamid.MSG2")).toBe(true);
   });
 
   it("stessa delivery processata con successo due volte → la seconda è deduped e l'handler non rigira", async () => {

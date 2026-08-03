@@ -295,15 +295,26 @@ export async function POST(req: Request): Promise<Response> {
   // INVARIANTE: la riga WebhookDelivery si scrive SOLO dopo che l'evento è stato
   // processato con successo. Spostare la create prima del handler = regressione
   // che perde messaggi (un retry del gateway verrebbe scartato come "duplicato").
-  const explicitKey = envelope.idempotencyKey || envelope.deliveryId || null;
-  // Fallback all'hash del rawBody SOLO per message.received (il body contiene l'id
-  // del messaggio WA → payload identico ⇒ stesso messaggio). Mai per session.*:
-  // gli heartbeat identici sono delivery diverse e l'handler di stato è idempotente.
+  // NB: deliveryId/idempotencyKey del gateway NON sono affidabili — il fork invia
+  // una costante ("msg_unknown") per ogni messaggio, che farebbe scartare TUTTI i
+  // messaggi dopo il primo come duplicati. Deriviamo quindi la chiave dal CONTENUTO:
+  //  - message.received: id WA del messaggio (stabile tra i retry, unico per
+  //    messaggio); se manca, hash del rawBody (payload identico ⇒ stesso messaggio).
+  //  - message.ack: nessun dedup (handler idempotente; ack delivered/read con lo
+  //    stesso id sono legittimi e non vanno collassati).
+  //  - session.*: nessun dedup (heartbeat identici sono delivery diverse e
+  //    l'handler di stato è idempotente).
+  const dedupeData = envelope.data ?? {};
+  const waMsgId =
+    typeof dedupeData.id === "string"
+      ? dedupeData.id
+      : typeof dedupeData.messageId === "string"
+        ? dedupeData.messageId
+        : null;
   const dedupeKey =
-    explicitKey ??
-    (envelope.event === "message.received"
-      ? createHash("sha256").update(rawBody).digest("hex")
-      : null);
+    envelope.event === "message.received"
+      ? `recv:${waMsgId ?? createHash("sha256").update(rawBody).digest("hex")}`
+      : null;
 
   if (dedupeKey) {
     const seen = await db.webhookDelivery.findUnique({ where: { key: dedupeKey } });
