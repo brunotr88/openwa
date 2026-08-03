@@ -254,6 +254,22 @@ async function generateAndDeliverReplyLocked(
     outsideBusinessHours: !isWithinSchedule(settings.hours),
   });
 
+  // Suggerimento sul saluto in base al tempo trascorso dall'ultimo messaggio.
+  // recent[0] è il messaggio appena ricevuto; recent[1] il precedente scambio.
+  // Salutare è naturale solo all'inizio di una conversazione o dopo una pausa
+  // lunga (ore/giorni); a conversazione in corso risulta ripetitivo — ed è ciò
+  // che accadeva quando le risposte FAILED sparivano dallo storico.
+  const GREETING_GAP_HOURS = 4;
+  const prevMsg = recent.length > 1 ? recent[1] : null;
+  const gapHours = prevMsg
+    ? (recent[0].createdAt.getTime() - prevMsg.createdAt.getTime()) / 3_600_000
+    : Infinity;
+  const greetingHint =
+    gapHours >= GREETING_GAP_HOURS
+      ? "Contesto conversazione: è la prima riga di una nuova conversazione o è passato parecchio tempo (diverse ore o giorni) dall'ultimo messaggio → un saluto iniziale è naturale."
+      : "Contesto conversazione: state già chiacchierando (ultimo messaggio da poco) → NON salutare di nuovo e non ripetere domande o proposte già fatte, entra dritto nel merito.";
+  system = `${system}\n\n${greetingHint}`;
+
   // Appuntamenti (M5): istruzioni nel prompt (Calendly link o tool Google).
   const apptPrompt = appointmentSystemPrompt(settings);
   if (apptPrompt) system = `${system}\n\n${apptPrompt}`;
