@@ -345,8 +345,15 @@ export function buildSystemPrompt(
     "Se il cliente chiede di parlare con una persona, conferma subito che un operatore lo ricontatterà al più presto."
   );
   if (behavior.aiDisclosure) {
+    // Trasparenza AI Act Art. 50(1): l'interessato deve sapere di parlare con
+    // un'IA. La presenza della dichiarazione alla prima interazione è garantita
+    // dal codice (lib/wa/ai-disclosure.ts); qui chiediamo al modello di farlo in
+    // modo naturale e — soprattutto — di non negarlo MAI se gli viene chiesto.
     parts.push(
       "Nel primo messaggio della conversazione presentati come assistente virtuale (AI) dell'attività."
+    );
+    parts.push(
+      "Se ti chiedono se sei un'intelligenza artificiale, un bot o una persona, rispondi sempre con sincerità che sei un assistente virtuale (IA): non fingerti mai un essere umano e non usare il nome di una persona reale come se fossi tu. Puoi restare caloroso e naturale, ma senza mai ingannare l'interlocutore."
     );
   }
   if (behavior.welcomeMessageEnabled) {

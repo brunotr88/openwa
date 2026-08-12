@@ -34,6 +34,7 @@ import {
 import { getSessionSettings } from "@/lib/settings/session";
 import { countSentToday } from "@/lib/outbound/daily-cap";
 import { sendText, contactChatId } from "./gateway-client";
+import { applyAiDisclosure, hasAiDisclosure } from "./ai-disclosure";
 
 /** Hard cap sul ritardo "umano" prima dell'invio (whatsapp-ops: max 10 s). */
 const MAX_RANDOM_DELAY_MS = 10_000;
@@ -342,8 +343,28 @@ async function generateAndDeliverReplyLocked(
     result = await provider.generate(generateInput);
   }
 
-  const text = result.text.trim();
+  let text = result.text.trim();
   if (!text) return null;
+
+  // ── Trasparenza AI Act, Art. 50(1)+(5) ────────────────────────────────────
+  // L'informativa "stai parlando con un'IA" va garantita dalla PROGETTAZIONE e
+  // data al più tardi alla prima interazione: il prompt lo chiede al modello,
+  // ma un'istruzione può essere omessa — qui la rendiamo deterministica.
+  // "Prima interazione" = nessuna risposta AI già RECAPITATA in questa
+  // conversazione (le bozze non ancora approvate non hanno informato nessuno).
+  if (settings.behavior.aiDisclosure && !hasAiDisclosure(text)) {
+    const alreadyDisclosed = await db.message.count({
+      where: {
+        conversationId: conversation.id,
+        direction: "OUT",
+        aiGenerated: true,
+        status: { in: ["SENT", "DELIVERED", "READ"] },
+      },
+    });
+    if (alreadyDisclosed === 0) {
+      text = applyAiDisclosure(text, { businessName: settings.persona.businessName });
+    }
+  }
 
   // ── FIX 2c: re-check anti-staleness prima di inviare in AUTO ──────────────
   // Tra l'inizio della generazione (chiamata LLM, potenzialmente lenta) e ora,

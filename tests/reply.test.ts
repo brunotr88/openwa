@@ -147,23 +147,47 @@ describe("generateAndDeliverReply — AUTO", () => {
           direction: "OUT",
           status: "QUEUED",
           aiGenerated: true,
-          body: "Sì, abbiamo disponibilità!",
+          // Prima risposta AI della conversazione → la disclosure AI Act
+          // (Art. 50) è aggiunta dal codice in coda al testo del modello.
+          body: expect.stringContaining("Sì, abbiamo disponibilità!"),
         }),
       })
     );
+    const sentBody = mockSendText.mock.calls[0][2] as string;
+    expect(sentBody).toContain("Sì, abbiamo disponibilità!");
+    expect(sentBody).toMatch(/assistente virtuale \(IA\)/);
     expect(mockSendText).toHaveBeenCalledWith(
       "gw-uuid",
       "393331234567@c.us",
-      "Sì, abbiamo disponibilità!"
+      expect.stringContaining("Sì, abbiamo disponibilità!")
     );
     expect(mockDb.message.update).toHaveBeenCalledWith({
       where: { id: "out1" },
       data: { status: "SENT", waMessageId: "wamid1" },
     });
+
     // audit-logged
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: "ai.reply.sent", entityId: "out1" })
     );
+  });
+
+  it("NON ripete la disclosure AI Act se una risposta AI è già stata recapitata", async () => {
+    // count() è condiviso con countSentToday: distinguiamo dalla where.
+    mockDb.message.count.mockImplementation(
+      async (args: { where?: Record<string, unknown> }) => {
+        const w = args?.where ?? {};
+        // query della disclosure: OUT + aiGenerated + status recapitati
+        if (w.aiGenerated === true && w.direction === "OUT") return 1; // già informato
+        return 0; // sentToday
+      }
+    );
+
+    await generateAndDeliverReply("conv1");
+
+    const sentBody = mockSendText.mock.calls[0][2] as string;
+    expect(sentBody).toBe("Sì, abbiamo disponibilità!");
+    expect(sentBody).not.toMatch(/assistente virtuale/i);
   });
 
   it("builds the prompt from tenant settings + contact profileSummary", async () => {
