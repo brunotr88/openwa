@@ -38,18 +38,27 @@ ENV HOSTNAME=0.0.0.0
 # wget/curl for Coolify healthcheck; openssl for Prisma at runtime.
 RUN apk add --no-cache wget curl openssl
 
+# Il container girava come root: non c'era alcuna direttiva USER.
+# L'utente si crea PRIMA delle COPY, e la proprieta' dei file si assegna
+# direttamente con --chown: un `chown -R` su tutto /app dopo la copia
+# rileggerebbe l'intero node_modules e allunga il build senza motivo.
+# Verificato che il container non monta alcun volume, quindi non ci sono file
+# di proprieta' di root da preservare e il cambio di utente non rompe nulla.
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser --system --uid 1001 nextjs
+
 # Standalone server + static assets + public dir.
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
 # Prisma schema/migrations + seed runner + entrypoint.
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/scripts ./scripts
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Full node_modules copy — selective copy breaks Prisma transitive deps (blueprint §5).
 # Dallo stage builder arriva ora l'albero gia' ripulito dalle devDependencies.
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # npm non serve a far girare l'applicazione: start.sh invoca il binario di Prisma
 # direttamente e il server parte con `node server.js`. Le dipendenze interne di
@@ -60,11 +69,6 @@ RUN rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/bin/npm \
            /usr/local/bin/npx
 
-# Il container girava come root: non c'era alcuna direttiva USER. Non ci sono
-# volumi montati, quindi non ci sono file di proprieta' di root da preservare.
-RUN addgroup --system --gid 1001 nodejs \
- && adduser --system --uid 1001 nextjs \
- && chown -R nextjs:nodejs /app
 USER nextjs
 
 EXPOSE 3000
