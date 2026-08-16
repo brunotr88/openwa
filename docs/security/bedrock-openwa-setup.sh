@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+# ============================================================================
+#  ESEGUITO IL 2026-08-16 — l'utente bedrock-openwa ESISTE GIA' e openwa-web
+#  usa gia' la sua chiave. Questo script resta come DOCUMENTAZIONE e per
+#  ricreare la stessa configurazione altrove (le altre 7 app che condividono
+#  ancora bedrock-invoker).
+#
+#  Verificato dopo il cutover:
+#   - simulate-principal-policy: allowed sui 2 inference profile EU;
+#     implicitDeny su modelli fuori EU, iam:CreateUser, s3:GetObject, polly
+#   - converse() reale riuscita su Sonnet e Haiku con la nuova chiave
+#   - un modello fuori policy (nova-pro) -> AccessDeniedException, come atteso
+#   - il container openwa-web usa esattamente quella chiave (confronto esatto)
+#   - CloudTrail attribuisce gli eventi Converse a userName=bedrock-openwa
+#   - bedrock-invoker lasciata ATTIVA: serve alle altre 7 app ed e' il rollback
+#  Valori della chiave: in C:\PROGETTI\credenziali.txt, sezione
+#  "## AWS bedrock-openwa".
+# ============================================================================
 # Utente IAM dedicato per openwa-web — DA ESEGUIRE A MANO, NON automatizzare.
 #
 # Perché: fino a oggi openwa-web usa la chiave di `bedrock-invoker`, CONDIVISA da
