@@ -46,7 +46,7 @@ function makeRequest(payload: unknown, signature?: string | null): Request {
 function messageReceivedEnvelope(data: Record<string, unknown> = {}) {
   return {
     event: "message.received",
-    timestamp: "2026-06-10T10:00:00.000Z",
+    timestamp: new Date().toISOString(),
     sessionId: "gw-session-uuid",
     idempotencyKey: "msg_abc",
     deliveryId: "dlv_1",
@@ -139,6 +139,29 @@ describe("POST /api/webhooks/wa — signature verification", () => {
   it("accepts a valid HMAC-SHA256 signature (sha256=<hex> of raw body)", async () => {
     const res = await POST(makeRequest(messageReceivedEnvelope()));
     expect(res.status).toBe(200);
+  });
+
+  // Anti-replay (hardening post-incidente 13/08): la firma copre il body, che
+  // contiene il timestamp; senza finestra di validità un payload firmato
+  // intercettato resterebbe rigiocabile per sempre.
+  it("rifiuta un payload firmato ma vecchio (replay)", async () => {
+    const stale = {
+      ...messageReceivedEnvelope(),
+      timestamp: new Date(Date.now() - 30 * 60_000).toISOString(),
+    };
+    const res = await POST(makeRequest(stale));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "stale timestamp" });
+    expect(mockDb.message.create).not.toHaveBeenCalled();
+  });
+
+  it("accetta comunque un payload senza timestamp leggibile (fail-open deliberato)", async () => {
+    // Il formato del timestamp lo decide il gateway: un fail-closed qui
+    // bloccherebbe TUTTI gli inbound, il danno peggiore possibile per il bot.
+    const noTs = { ...messageReceivedEnvelope(), timestamp: "non-una-data" };
+    const res = await POST(makeRequest(noTs));
+    expect(res.status).toBe(200);
+    expect(mockDb.message.create).toHaveBeenCalled();
   });
 });
 
@@ -281,7 +304,7 @@ describe("POST /api/webhooks/wa — message.ack", () => {
   function ackEnvelope(data: Record<string, unknown>) {
     return {
       event: "message.ack",
-      timestamp: "2026-06-10T10:00:00.000Z",
+      timestamp: new Date().toISOString(),
       sessionId: "gw-session-uuid",
       idempotencyKey: "ack_1",
       data,
@@ -325,7 +348,7 @@ describe("POST /api/webhooks/wa — session.status", () => {
   function statusEnvelope(status: string) {
     return {
       event: "session.status",
-      timestamp: "2026-06-10T10:00:00.000Z",
+      timestamp: new Date().toISOString(),
       sessionId: "gw-session-uuid",
       data: { status },
     };

@@ -47,7 +47,7 @@ function makeRequest(payload: unknown): Request {
 function envelope(data: Record<string, unknown>) {
   return {
     event: "message.received",
-    timestamp: "2026-06-10T10:00:00.000Z",
+    timestamp: new Date().toISOString(),
     sessionId: "gw-session-uuid",
     data: {
       id: "true_393331234567@c.us_ABC",

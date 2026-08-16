@@ -394,6 +394,24 @@ async function resolveBody(
   return result.text.trim();
 }
 
+/**
+ * Ripulisce il messaggio d'errore prima di persistirlo in OutboundJob.lastError,
+ * che è poi leggibile via GET /api/v1/messages/[id].
+ * Gli errori di firma SigV4 di AWS includono il "credential scope", che contiene
+ * l'ACCESS KEY ID in chiaro (es. "Credential=AKIA.../20260816/eu-central-1/...").
+ * Non è il segreto, ma è mezza credenziale e un identificativo che non deve
+ * uscire da un endpoint API. Redigiamo anche eventuali bearer/api key.
+ */
+export function redactError(message: string): string {
+  return message
+    .replace(/AKIA[0-9A-Z]{16}/g, "AKIA****REDACTED")
+    .replace(/ASIA[0-9A-Z]{16}/g, "ASIA****REDACTED")
+    .replace(/(Credential=)[^,\s]+/gi, "$1****REDACTED")
+    .replace(/(Signature=)[0-9a-f]{16,}/gi, "$1****REDACTED")
+    .replace(/owa_k1_[A-Za-z0-9]+/g, "owa_k1_****REDACTED")
+    .replace(/(Bearer\s+)[A-Za-z0-9._-]{8,}/gi, "$1****REDACTED");
+}
+
 async function markFailed(
   jobId: string,
   tenantId: string,
@@ -403,7 +421,7 @@ async function markFailed(
   e: unknown
 ): Promise<JobOutcome> {
   const nextAttempts = attempts + 1;
-  const error = e instanceof Error ? e.message : String(e);
+  const error = redactError(e instanceof Error ? e.message : String(e));
   if (nextAttempts >= maxAttempts) {
     await db.outboundJob.update({
       where: { id: jobId },
