@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Non annunciare il framework: è fingerprinting gratuito per chi cerca CVE
+  // note di Next.js (esattamente il motivo per cui la versione è stata alzata).
+  poweredByHeader: false,
   output: "standalone",
   async headers() {
     return [

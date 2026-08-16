@@ -35,6 +35,12 @@ import { getSessionSettings } from "@/lib/settings/session";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Finestra di validità del timestamp del webhook (anti-replay). Generosa:
+ * copre il clock skew fra gateway e app e gli eventuali retry del gateway.
+ */
+const WEBHOOK_MAX_SKEW_MS = 5 * 60_000;
+
 const SIGNATURE_HEADER = "x-openwa-signature";
 
 interface WebhookEnvelope {
@@ -289,6 +295,30 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (!envelope || typeof envelope.event !== "string" || typeof envelope.sessionId !== "string") {
     return Response.json({ error: "invalid payload" }, { status: 400 });
+  }
+
+  // --- Anti-replay ---------------------------------------------------------
+  // La firma HMAC copre il raw body, e il body CONTIENE envelope.timestamp:
+  // la firma quindi protegge già il timestamp, non serve cambiare lo schema di
+  // firma (né toccare il gateway). Quello che mancava era una finestra di
+  // validità: senza, un payload firmato intercettato una volta resta valido per
+  // sempre e può essere rigiocato (il dedup copre solo message.received, non
+  // message.ack né session.*).
+  // Prudenza deliberata: rifiutiamo SOLO i timestamp leggibili e chiaramente
+  // vecchi. Se il campo manca o non è parsabile lasciamo passare con un warning,
+  // perché il formato lo decide il gateway e un fail-closed qui bloccherebbe
+  // TUTTI i messaggi in ingresso — il danno peggiore possibile per questo bot.
+  const ts = Date.parse(envelope.timestamp ?? "");
+  if (Number.isNaN(ts)) {
+    console.warn(`[webhook/wa] timestamp assente o non parsabile per ${envelope.event}`);
+  } else {
+    const skewMs = Math.abs(Date.now() - ts);
+    if (skewMs > WEBHOOK_MAX_SKEW_MS) {
+      console.warn(
+        `[webhook/wa] scartato ${envelope.event}: timestamp fuori finestra (${Math.round(skewMs / 1000)}s)`
+      );
+      return Response.json({ error: "stale timestamp" }, { status: 401 });
+    }
   }
 
   // --- Idempotenza: check-prima, marca-solo-dopo-successo ---
